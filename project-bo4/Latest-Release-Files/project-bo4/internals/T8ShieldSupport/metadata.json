@@ -1,0 +1,730 @@
+{
+    "name": "T8ShieldSupport",
+    "data": [
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/rankutils/maxrankdata_mp.csv",
+            "path": "Data/maxrankdata_mp.csv"
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/rankutils/maxrankdata_wz.csv",
+            "path": "Data/maxrankdata_wz.csv"
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/rankutils/maxrankdata_zm.csv",
+            "path": "Data/maxrankdata_zm.csv"
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/randomutils/mp_randombots.csv",
+            "path": "Data/mp_randombots.csv"
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/randomutils/wz_randombots.csv",
+            "path": "Data/wz_randombots.csv"
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/randomutils/mp_randombots_camos.csv",
+            "path": "Data/mp_randombots_camos.csv"
+        },
+        {
+            "type": "scriptparsetree",
+            "name": "scripts/core_common/SupportGSC.gsc",
+            "path": "SupportGSC.gsic",
+            "hooks": [
+                "scripts/core_common/load_shared.gsc"
+            ]
+        },
+        {
+            "type": "scriptparsetree",
+            "name": "scripts/core_common/SupportCSC.csc",
+            "path": "SupportCSC.csic",
+            "hooks": [
+                "scripts/core_common/load_shared.csc"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/FrontHelper",
+            "path": "FrontHelper.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameHelper",
+            "path": "GameHelper.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameHelper",
+            "path": "GameHelper.luac",
+            "hooks_post": [
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "stringtable",
+            "name": "gamedata/shield/support_errors.csv",
+            "path": "SupportUtils\\SupportErrors.tsv",
+            "separator": "\t"
+        },
+        {
+            "type": "hashes",
+            "path": "SupportUtils\\SupportStrings.txt",
+            "format": "string",
+            "ignore_error": true
+        },
+        {
+            "type": "hashes",
+            "path": "SupportUtils\\SupportHashes.txt",
+            "format": "serious_compiler",
+            "ignore_error": true
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_65ac0bdfc731aeda",
+            "value": "Welcome to Shield Client, Connecting!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_6959976d30a883cb",
+            "value": "Connecting to Server IP..."
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_b6154c132fda6ee",
+            "value": "Can't connect to the Server, Check the Server IP in project-bo4.json file."
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_17dbbb9c5e6880ac",
+            "value": "&&1 has been banned from playing on this Shield Server!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_5aa949e6b34e89ea",
+            "value": "You have been disconnected from the Shield Server!, You can reconnect in the Server Browser menu or Restarting the game."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/disconnect",
+            "value": "Disconnect from current server"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/random_music_toggle",
+            "value": "Play Random Music"
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_303cdaf1f38c88a4",
+            "value": "This lobby is currently closed (Private Lobby)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bots_wz_lives",
+            "value": "Bots Respawn Lives"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bots_wz_lives_desc",
+            "value": "Toggle if Bots can respawn after being killed (5 lives for each bot)."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server_filter",
+            "value": "Filter Gamemode"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server_style",
+            "value": "Servers Style"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server_style_0",
+            "value": "Default"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server_style_1",
+            "value": "Alt Style"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/toggle_mod",
+            "value": "Toggle Mod"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/perfor_mode_frontend",
+            "value": "Performance Mode (Frontend)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/perfor_mode_frontend_desc",
+            "value": "Disables most of the scenes in frontend, to improve performance."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/show_script",
+            "value": "Show Debug Engine Usages"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/show_script_desc",
+            "value": "Displays the usage of script variables/level entities/element pool size/etc in the screen, useful for debugging. (needs restarting)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/friends_option",
+            "value": "Menu"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/friends_option1",
+            "value": "Active Friends"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/friends_option2",
+            "value": "Friend Requests"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/send_friend",
+            "value": "Send Shield Friend Request"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/custombutton",
+            "value": "Custom Shield Button"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/launchgame",
+            "value": "Launch Game"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/lobbypubs",
+            "value": "Shield Public Lobbies"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/lobbyone",
+            "value": "Lobby One"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/prestige_master",
+            "value": "Prestige Master Activated!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/slide",
+            "value": "Slide Movement Cooldown"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/slide_desc",
+            "value": "Adjusts the slide cooldown for all modes. (Default is 10)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/prevent_dw_disconnect",
+            "value": "Prevent Demonware Disconnection (Hibernate Fix)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/prevent_dw_disconnect_desc",
+            "value": "Makes it that you can not get disconnected from the game at all, but you won't be able to join public matches or level up progression if you are disconnected! (useful for zombies high rounds - restart required)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/offline_perks",
+            "value": "Zombies: Disable Online Perks"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/offline_perks_desc",
+            "value": "Same as PS4/5 Offline mode, disables the online perks in zombies, so you can use the offline perks only. (Blood Wolf Bite, Blaze Phase, Zombshell, Host Only)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bots_difficulty",
+            "value": "Bot Difficulty"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bots_difficulty_desc",
+            "value": "Sets the difficulty of Bots (Blackout)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_alts",
+            "value": "Blackout Map"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_alts_desc",
+            "value": "Changes Blackout Maps (Must be Host, use only for custom games!)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/alt_movement",
+            "value": "Alt Movement Mode"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/alt_movement_desc",
+            "value": "Enables Alternative Movement Mechanics (Like infinite sliding, requires restart, will make the gsc/csc checksum always red!)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_def",
+            "value": "Default Map"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_alts_other",
+            "value": "Alcatraz Map"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_alts_other_night",
+            "value": "Alcatraz Map (Night)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/ui_colors_setting",
+            "value": "UI Colors"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/Green",
+            "value": "^2Color Green"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/Blue",
+            "value": "^5Color Blue"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/Red",
+            "value": "^1Color Red"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/Default_Color",
+            "value": "Default Color"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_all",
+            "value": "Unlock All"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_all_desc",
+            "value": "Unlocks Everything in All Gamemodes"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_attch",
+            "value": "Unlock Attachments"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_attch_desc",
+            "value": "Unlocks All Weapon's Attachments"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_loot",
+            "value": "Unlock Loot"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_loot_desc",
+            "value": "Unlocks Loot and Sets Max Elixirs in Zombies"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_camos",
+            "value": "Unlock Camos/Cards"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_camos_desc",
+            "value": "Unlocks All Weapon's Camos and All Calling Cards"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_items",
+            "value": "Unlock Items"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlock_items_desc",
+            "value": "Unlocks All Weapons, and Some Other Stuff"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlockclassslots",
+            "value": "Unlock Class Slots"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/unlockclassslots_desc",
+            "value": "Unlocks The Extra Class Slots in Multiplayer (12 Class Slots in Total)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/f_unlockall",
+            "value": "Unlock All Options"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/e_unlockall",
+            "value": "Unlock All Enabled"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/d_unlockall",
+            "value": "Unlock All Disabled"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/serverbrowser",
+            "value": "Server Browser"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/servers",
+            "value": "Servers"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server1",
+            "value": "^3Public Server 1 (Hosted by BodNJenie)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/server2",
+            "value": "^3Public Server 2 (Hosted by ????)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/prestige",
+            "value": "Prestige Activated!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fresh_start",
+            "value": "Fresh Start Activated!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bothard",
+            "value": "Hard Mode"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/bothard_desc",
+            "value": "Adds an Extra Bots (18 in Total if with All Bots), and Sets the Extra Bots to a Very Hard Mode"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/settings_tab",
+            "value": "Shield Settings"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/ip_notice",
+            "value": "IP has been Set!, You can reconnect from main menu."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main",
+            "value": "Shield Text Watermark"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_desc",
+            "value": "Displays a text in top right that says Shield: <version>. (Restart Required)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_mods",
+            "value": "Mods Watermark"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_mods_desc",
+            "value": "Displays a mod loaded list with hashes next to the Shield Text Watermark. (Restart Required)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_checksum",
+            "value": "GSC/CSC Checksum"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_checksum_desc",
+            "value": "Displays a GSC/CSC checksum under the Shield Text Watermark. (Restart Required)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_flash_hashes",
+            "value": "Flash Hashes"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/watermark_main_flash_hashes_desc",
+            "value": "Displays loaded and raw mod files and their hashes in starting game of zombies. (Restart Required)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist",
+            "value": "Aim Assist"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_desc",
+            "value": "Enables Aim Assist with Controllers"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_lock",
+            "value": "Aim Assist: Lock-on"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_lock_desc",
+            "value": "Enables Aim Assist Lock-on, (Note: Only for Zombies Mode)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_slow",
+            "value": "Aim Assist: Slowdown"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_slow_desc",
+            "value": "Enables Aim Assist Slowdown when Aiming"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_closetarget",
+            "value": "Aim Assist: Aim Closest Target"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aimassist_closetarget_desc",
+            "value": "Target the closest AI based on 3d distance, (Note: Only for Zombies Mode)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/zombies_difficulty",
+            "value": "Zombie Difficulty"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/locklobby",
+            "value": "Close Lobby"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/blureffect",
+            "value": "Main Menu: Alt Style"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/roundcnt",
+            "value": "Round Counter Logic (for 255+)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/force_zm",
+            "value": "Force Character"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/use_wz_alts_desc",
+            "value": "Changes Blackout Maps (Must be Host!)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/ui_colors_setting_desc",
+            "value": "Changes Style of Alert Messages"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/blureffect_desc",
+            "value": "Changes the style of Main Menu, needs restarting"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/roundcnt_desc",
+            "value": "Changes the counter logic of Rounds in zombies, (Might be buggy for mod menus if you revert the round, also does not work in theater mode.)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/checksum",
+            "value": "Show checksum for GSC/CSC"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/checksum_desc",
+            "value": "Shows the checksum value of GSC/CSC scripts, needs restarting."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/botsrandom",
+            "value": "Random Bots Camos/Skins (MP/WZ)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/botsrandom_desc",
+            "value": "Makes the bots have random skins and camos, other stuff."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/discordrpc",
+            "value": "Discord RPC"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/discordrpc_desc",
+            "value": "Shows game status info in your discord profile, needs restarting"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/set_music_tr",
+            "value": "Set music for Main Menu"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/set_music_wz",
+            "value": "Set music for Blackout"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/set_music_mp",
+            "value": "Set music for Multiplayer"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/set_music_zm",
+            "value": "Set music for Zombies"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/clear_all_music",
+            "value": "Reset Music back to default"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/clear_music",
+            "value": "Clear music of all modes"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/select_music",
+            "value": "Select Music"
+        },
+        {
+            "type": "localizeentry",
+            "name": "hash_1d39f140af582e3a",
+            "value": "Welcome to Shield Client, Play respectfully and have fun."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fov_wrong",
+            "value": "^1Invalid FOV scale"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fov_set",
+            "value": "^2FOV scale has been set!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/achv",
+            "value": "Shield's Achievements"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/realst_zm",
+            "value": "Psychosurgery"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/realst_zm_desc",
+            "value": "in Zombies, Complete every maps's quests on realistic"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/client_num_helper",
+            "value": "Set Players Engine/Party Limit"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/wz_bots_helper",
+            "value": "Blackout Bots Count"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/wz_uav",
+            "value": "Player Infinite UAV"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/wz_uav_desc",
+            "value": "Enables infinite uav for all players to help with finding bots"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/hard_zm",
+            "value": "Crazy Fucking Ship"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/hard_zm_desc",
+            "value": "in Voyage Of Despair, Complete the quest on realistic without using any perks, elixirs, or talismans."
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fanofshit",
+            "value": "High Rounding Fan"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fanofshit_desc",
+            "value": "in Zombies (any map), Reach round 50 on hardcore or above"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fuckshit",
+            "value": "Well that was a waste"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fuckshit_desc",
+            "value": "in Zombies, die after popping a Perkaholic"
+        }
+    ],
+    "cache": [],
+    "enabled": true
+}

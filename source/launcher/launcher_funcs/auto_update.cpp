@@ -13,17 +13,10 @@
 #include <filesystem>
 
 namespace updater {
-
     const std::string SERVER_VERSION = "1.0.0";
 
-	//test repo for testing update soon as i fluffed it
-    //const std::string GITHUB_API_URL = "https://api.github.com/repos/bodnjenie14/bo4-test/releases/latest";
-    //const std::string DOWNLOAD_URL_BASE = "https://github.com/bodnjenie14/bo4-test/releases/download/";
-
-
-    const std::string GITHUB_API_URL = "https://api.github.com/repos/bodnjenie14/Project_-bo4_Launcher/releases/latest";
-    const std::string DOWNLOAD_URL_BASE = "https://github.com/bodnjenie14/Project_-bo4_Launcher/releases/download/";
-
+    const std::string GITHUB_API_URL = "https://api.github.com/repos/NotNierPea/shield-launcher/releases/latest";
+    const std::string DOWNLOAD_URL_BASE = "https://github.com/NotNierPea/shield-launcher/releases/download/";
 
     bool check_for_updates() {
         logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Checking GitHub API: %s", GITHUB_API_URL.c_str());

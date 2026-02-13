@@ -1,0 +1,10 @@
+{
+    "modid": "support_ff_main",
+    "fastfile_hook": [
+        {
+            "name": "support",
+            "hook": "core_common",
+            "is_common": true
+        }
+    ]
+}
