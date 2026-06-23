@@ -1,4 +1,5 @@
 @echo off
-tools\premake5 %* vs2022
+git submodule update --init --recursive
+tools\premake5 %* vs2026
 
 pause

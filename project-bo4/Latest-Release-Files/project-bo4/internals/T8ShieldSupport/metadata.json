@@ -34,7 +34,7 @@
         {
             "type": "scriptparsetree",
             "name": "scripts/core_common/SupportGSC.gsc",
-            "path": "SupportGSC.gsic",
+            "path": "Scripts\\SupportGSC.gsic",
             "hooks": [
                 "scripts/core_common/load_shared.gsc"
             ]
@@ -42,35 +42,506 @@
         {
             "type": "scriptparsetree",
             "name": "scripts/core_common/SupportCSC.csc",
-            "path": "SupportCSC.csic",
+            "path": "Scripts\\SupportCSC.csic",
             "hooks": [
                 "scripts/core_common/load_shared.csc"
             ]
         },
+
         {
             "type": "luafile",
-            "name": "ui/shield/FrontHelper",
-            "path": "FrontHelper.luac",
+            "name": "ui/shield/Utils",
+            "path": "Lua\\Frontend\\Utils.luac",
             "hooks_post": [
                 "x64:4ed0bcba9d999e0f"
             ]
         },
         {
             "type": "luafile",
-            "name": "ui/shield/GameHelper",
-            "path": "GameHelper.luac",
+            "name": "ui/shield/MainMenu",
+            "path": "Lua\\Frontend\\MainMenu.luac",
             "hooks_post": [
-                "x64:46f417a74d9ab424"
+                "x64:4ed0bcba9d999e0f"
             ]
         },
         {
             "type": "luafile",
-            "name": "ui/shield/GameHelper",
-            "path": "GameHelper.luac",
+            "name": "ui/shield/PreGameButtons",
+            "path": "Lua\\Frontend\\PreGameButtons.luac",
             "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/DirectorPregameArena",
+            "path": "Lua\\Frontend\\DirectorPregameArena.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/DiscordRPC",
+            "path": "Lua\\Frontend\\DiscordRPC.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ModManager",
+            "path": "Lua\\Frontend\\ModManager.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Connection",
+            "path": "Lua\\Frontend\\Connection.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ShieldOptions",
+            "path": "Lua\\Frontend\\ShieldOptions.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/EditBoxes",
+            "path": "Lua\\Frontend\\EditBoxes.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/RankUtils",
+            "path": "Lua\\Frontend\\RankUtils.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/RulesManager",
+            "path": "Lua\\Frontend\\RulesManager.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/MusicManager",
+            "path": "Lua\\Frontend\\MusicManager.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/DirectorPublic",
+            "path": "Lua\\Frontend\\DirectorPublic.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/DirectorPrivate",
+            "path": "Lua\\Frontend\\DirectorPrivate.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ZombiesEasterEggChecks",
+            "path": "Lua\\Frontend\\ZombiesEasterEggChecks.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ChatCommands",
+            "path": "Lua\\Frontend\\ChatCommands.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Chat",
+            "path": "Lua\\Frontend\\Chat.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Overlay",
+            "path": "Lua\\Frontend\\Overlay.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/BlackoutSliderNoLocalize",
+            "path": "Lua\\Frontend\\BlackoutSliderNoLocalize.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/BlackoutRules",
+            "path": "Lua\\Frontend\\BlackoutRules.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/SystemOverlay",
+            "path": "Lua\\Frontend\\SystemOverlay.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/DirectorCustom",
+            "path": "Lua\\Frontend\\DirectorCustom.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/MatchmakingDvars",
+            "path": "Lua\\Frontend\\MatchmakingDvars.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/UnlockAll",
+            "path": "Lua\\Frontend\\UnlockAll.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/FOVAimAssist",
+            "path": "Lua\\Frontend\\FOVAimAssist.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/MiscSettings",
+            "path": "Lua\\Frontend\\MiscSettings.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ZombiesLobbySettings",
+            "path": "Lua\\Frontend\\ZombiesLobbySettings.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/MultiplayerLobbySettings",
+            "path": "Lua\\Frontend\\MultiplayerLobbySettings.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ZombiesPublicMatches",
+            "path": "Lua\\Frontend\\ZombiesPublicMatches.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/PatchNotes",
+            "path": "Lua\\Frontend\\PatchNotes.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/BlackoutWinIcons",
+            "path": "Lua\\Frontend\\BlackoutWinIcons.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/LobbyBrowser",
+            "path": "Lua\\Frontend\\LobbyBrowser.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ServerORLobbyBrowserSelect",
+            "path": "Lua\\Frontend\\ServerORLobbyBrowserSelect.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ServerBrowser",
+            "path": "Lua\\Frontend\\ServerBrowser.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Friends",
+            "path": "Lua\\Frontend\\Friends.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Party",
+            "path": "Lua\\Frontend\\Party.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/CustomSlider",
+            "path": "Lua\\Frontend\\CustomSlider.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ClanTag",
+            "path": "Lua\\Frontend\\ClanTag.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/MultiplayerExtraGamemodes",
+            "path": "Lua\\Frontend\\MultiplayerExtraGamemodes.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/BlackoutSettings",
+            "path": "Lua\\Frontend\\BlackoutSettings.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/WatermarkSettings",
+            "path": "Lua\\Frontend\\WatermarkSettings.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/RemovePopUps",
+            "path": "Lua\\Frontend\\RemovePopUps.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Social",
+            "path": "Lua\\Frontend\\Social.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Playlists",
+            "path": "Lua\\Frontend\\Playlists.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/CreateClassFix",
+            "path": "Lua\\Frontend\\CreateClassFix.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/Mastercraft",
+            "path": "Lua\\Frontend\\Mastercraft.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ProgressionFixes",
+            "path": "Lua\\Frontend\\ProgressionFixes.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/ReloadOverrides",
+            "path": "Lua\\Frontend\\ReloadOverrides.luac",
+            "hooks_post": [
+                "x64:4ed0bcba9d999e0f"
+            ]
+        },
+
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameUtils",
+            "path": "Lua\\Game\\Utils.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
                 "x64:57d27ab8e2f7a9d0"
             ]
         },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameChat",
+            "path": "Lua\\Game\\Chat.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameChatCommands",
+            "path": "Lua\\Game\\ChatCommands.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameSocial",
+            "path": "Lua\\Game\\Social.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameSystemOverlay",
+            "path": "Lua\\Game\\SystemOverlay.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameTeamChangeFixes",
+            "path": "Lua\\Game\\TeamChangeFixes.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameBlackoutStartMatchButton",
+            "path": "Lua\\Game\\BlackoutStartMatchButton.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameDiscordRPC",
+            "path": "Lua\\Game\\DiscordRPC.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameHashesFlash",
+            "path": "Lua\\Game\\HashesFlash.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameRoundPatch255",
+            "path": "Lua\\Game\\RoundPatch255.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameSubtitleFix",
+            "path": "Lua\\Game\\SubtitleFix.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+        {
+            "type": "luafile",
+            "name": "ui/shield/GameReloadOverrides",
+            "path": "Lua\\Game\\ReloadOverrides.luac",
+            "hooks_post": [
+                "x64:46f417a74d9ab424",
+                "x64:57d27ab8e2f7a9d0"
+            ]
+        },
+
         {
             "type": "stringtable",
             "name": "gamedata/shield/support_errors.csv",
@@ -692,7 +1163,7 @@
         {
             "type": "localizeentry",
             "name": "hash_1d39f140af582e3a",
-            "value": "Welcome to Shield Client, Play respectfully and have fun."
+            "value": "Welcome to Shield Client, Play respectfully and have fun. \nto mute chat, type /mute, to unmute, type /unmute."
         },
         {
             "type": "localizeentry",
@@ -702,7 +1173,17 @@
         {
             "type": "localizeentry",
             "name": "shield/fovscale_desc",
-            "value": "Adjust the FOV scale, and viewmodel scale. (Requires Restart, Commands in Chat: /fov [scale], /gunx [scale], /guny [scale], /gunz [scale], Will make the gsc/csc checksum always red!)"
+            "value": "Adjust the FOV, Aspect Ratio, Gun POS, and viewmodel scale. (Requires Restart to Enable, Commands in Chat: /fov [scale - default: 1.0], for viewmodel scale: /viewmodel [fov number - default: 90.0], for aspect ratio: /ratio [scale - default: 1.0], for moving the gun around: /gunx [scale - default: 0.0], /guny [scale - default: 0.0], /gunz [scale - default: 0.0], Will make the gsc/csc checksum always red!)"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fov_forceADS",
+            "value": "Ignore ADS FOV"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/fov_forceADS_desc",
+            "value": "Makes the FOV Scale ignore ADS FOV (when aiming down sights)"
         },
         {
             "type": "localizeentry",
@@ -716,6 +1197,26 @@
         },
         {
             "type": "localizeentry",
+            "name": "shield/viewmodel_wrong",
+            "value": "^1Invalid Viewmodel scale"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/viewmodel_set",
+            "value": "^2Viewmodel scale has been set!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aspect_wrong",
+            "value": "^1Invalid Aspect Ratio scale"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/aspect_set",
+            "value": "^2Aspect Ratio scale has been set!"
+        },
+        {
+            "type": "localizeentry",
             "name": "shield/gun_fov_wrong",
             "value": "^1Invalid Gun scale"
         },
@@ -724,6 +1225,22 @@
             "name": "shield/gun_fov_set",
             "value": "^2Gun scale has been set!"
         },
+        {
+            "type": "localizeentry",
+            "name": "shield/chat_mute",
+            "value": "^2Chat has been muted!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/chat_unmute",
+            "value": "^2Chat has been unmuted!"
+        },
+        {
+            "type": "localizeentry",
+            "name": "shield/gun_fov_set",
+            "value": "^2Gun scale has been set!"
+        },
+        
         {
             "type": "localizeentry",
             "name": "shield/achv",

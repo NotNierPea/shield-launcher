@@ -1,10 +1,9 @@
 {
     "modid": "support_ff_main",
-    "fastfile_hook": [
-        {
-            "name": "support",
+    "fastfiles" : {
+        "support": {
             "hook": "core_common",
-            "is_common": true
+            "type": "common"
         }
-    ]
+    }
 }

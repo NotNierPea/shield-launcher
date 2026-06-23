@@ -74,7 +74,10 @@ workspace "Shield_launcher"
 		defines {"CI"}
 	end
 
-    flags { "NoIncrementalLink", "NoMinimalRebuild", "MultiProcessorCompile", "No64BitChecks" }
+    incrementallink "Off"
+	minimalrebuild "Off"
+	multiprocessorcompile "On"
+	enable64bitchecks "Off"
 
 	filter "platforms:x64"
 		defines {"_WINDOWS", "WIN32"}
