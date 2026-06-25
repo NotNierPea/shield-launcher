@@ -1308,5 +1308,12 @@
         }
     ],
     "cache": [],
+    "redirect": [
+        {
+            "type": "image",
+            "origin": "t7_menu_loadingspinner_flipbook",
+            "target": "loading_shield"
+        }
+    ],
     "enabled": true
 }
