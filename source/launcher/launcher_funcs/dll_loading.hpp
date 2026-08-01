@@ -14,5 +14,7 @@ namespace DllLoading {
 
     Result extractDlls(const std::string& gameDir, bool isOnline, bool reshadeEnabled);
 
+    Result extractExe(const std::string& gameDir);
+
     bool launchGame(const std::string& gameExePath, bool isOnline);
 }

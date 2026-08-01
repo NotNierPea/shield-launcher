@@ -266,13 +266,11 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
 
     if (!isVanilla)
     {
-        auto result = DllLoading::extractDlls(currentDir, isOnline, reshadeEnabled);
-        if(result != DllLoading::Result::Success) {
+        auto handleExtractionError = [&](DllLoading::Result result, const QString& missingFileMsg) {
             QString errorMsg;
             switch(result) {
             case DllLoading::Result::FileNotFound:
-                errorMsg = QString("Required files not found! Make sure %1 exists in the launcher directory.")
-                    .arg(isOnline ? "mp.zip" : "solo.zip");
+                errorMsg = missingFileMsg;
                 break;
             case DllLoading::Result::InvalidGamePath:
                 errorMsg = "BlackOps4.exe not found! Make sure the launcher shortcut is in the game directory.";
@@ -289,6 +287,18 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
             vanillaButton->setEnabled(true);
             onlineButton->setEnabled(true);
             offlineButton->setEnabled(true);
+        };
+
+        auto dllResult = DllLoading::extractDlls(currentDir, isOnline, reshadeEnabled);
+        if(dllResult != DllLoading::Result::Success) {
+            handleExtractionError(dllResult, QString("Required files not found! Make sure %1 exists in the launcher directory.")
+                .arg(isOnline ? "mp.zip" : "solo.zip"));
+            return;
+        }
+
+        auto exeResult = DllLoading::extractExe(currentDir);
+        if(exeResult != DllLoading::Result::Success) {
+            handleExtractionError(exeResult, "Required files not found! Make sure exe.zip exists in the launcher directory.");
             return;
         }
     }

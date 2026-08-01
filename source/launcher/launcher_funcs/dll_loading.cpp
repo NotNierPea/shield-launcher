@@ -4,12 +4,104 @@
 #include <TlHelp32.h>
 #include <filesystem>
 #include <fstream>
+#include <vector>
+#include <cstdint>
 #include <zlib.h>
 #include <QCoreApplication>
 #include <thread>
 #include <atomic>
 
 namespace fs = std::filesystem;
+
+namespace {
+    // CRC-32 for checking dlls and exe
+    bool computeFileCrc32(const fs::path& filePath, uint32_t& outCrc) {
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file) {
+            return false;
+        }
+
+        uLong crc = crc32(0L, Z_NULL, 0);
+        std::vector<char> buffer(1 << 16);
+        while (file.read(buffer.data(), buffer.size()) || file.gcount() > 0) {
+            crc = crc32(crc, reinterpret_cast<const Bytef*>(buffer.data()), static_cast<uInt>(file.gcount()));
+        }
+
+        outCrc = static_cast<uint32_t>(crc);
+        return true;
+    }
+
+    // read
+    bool getZipEntryCrc32(const fs::path& zipPath, const std::string& entryName, uint32_t& outCrc) {
+        std::ifstream file(zipPath, std::ios::binary);
+        if (!file) {
+            return false;
+        }
+
+        file.seekg(0, std::ios::end);
+        const auto fileSize = static_cast<std::streamoff>(file.tellg());
+        if (fileSize < 22) {
+            return false;
+        }
+
+        const std::streamoff searchWindow = std::min<std::streamoff>(fileSize, 22 + 65536);
+        std::vector<unsigned char> tail(static_cast<size_t>(searchWindow));
+        file.seekg(fileSize - searchWindow);
+        file.read(reinterpret_cast<char*>(tail.data()), tail.size());
+
+        std::streamoff eocdOffset = -1;
+        for (std::streamoff i = static_cast<std::streamoff>(tail.size()) - 22; i >= 0; --i) {
+            if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
+                eocdOffset = i;
+                break;
+            }
+        }
+        if (eocdOffset < 0) {
+            return false;
+        }
+
+        const uint32_t centralDirOffset =
+            static_cast<uint32_t>(tail[eocdOffset + 16]) |
+            (static_cast<uint32_t>(tail[eocdOffset + 17]) << 8) |
+            (static_cast<uint32_t>(tail[eocdOffset + 18]) << 16) |
+            (static_cast<uint32_t>(tail[eocdOffset + 19]) << 24);
+
+        file.seekg(centralDirOffset);
+
+        while (file) {
+            unsigned char header[46];
+            file.read(reinterpret_cast<char*>(header), sizeof(header));
+            if (file.gcount() != static_cast<std::streamsize>(sizeof(header))) {
+                break;
+            }
+            if (!(header[0] == 0x50 && header[1] == 0x4b && header[2] == 0x01 && header[3] == 0x02)) {
+                break;
+            }
+
+            const uint32_t crc =
+                static_cast<uint32_t>(header[16]) |
+                (static_cast<uint32_t>(header[17]) << 8) |
+                (static_cast<uint32_t>(header[18]) << 16) |
+                (static_cast<uint32_t>(header[19]) << 24);
+
+            const uint16_t nameLen = static_cast<uint16_t>(header[28]) | (static_cast<uint16_t>(header[29]) << 8);
+            const uint16_t extraLen = static_cast<uint16_t>(header[30]) | (static_cast<uint16_t>(header[31]) << 8);
+            const uint16_t commentLen = static_cast<uint16_t>(header[32]) | (static_cast<uint16_t>(header[33]) << 8);
+
+            std::string name(nameLen, '\0');
+            file.read(name.data(), nameLen);
+
+            if (name == entryName) {
+                outCrc = crc;
+                return true;
+            }
+
+            file.seekg(extraLen + commentLen, std::ios::cur);
+        }
+
+        return false;
+    }
+}
 
 namespace DllLoading {
     std::thread cleanupThread;
@@ -177,9 +269,15 @@ namespace DllLoading {
         }
 
         fs::path dllPath = gamePath / "XInput9_1_0.dll";
-        if (fs::exists(dllPath)) {
-            std::cout << "DLL already exists, will still extraction" << std::endl;
-            //return Result::Success;
+
+        uint32_t zipDllCrc = 0;
+        uint32_t existingDllCrc = 0;
+        if (fs::exists(dllPath) &&
+            getZipEntryCrc32(zipPath, "XInput9_1_0.dll", zipDllCrc) &&
+            computeFileCrc32(dllPath, existingDllCrc) &&
+            zipDllCrc == existingDllCrc) {
+            std::cout << "XInput9_1_0.dll already up to date, skipping extraction" << std::endl;
+            return Result::Success;
         }
 
         try {
@@ -201,6 +299,82 @@ namespace DllLoading {
                 return Result::FileNotFound;
             }
             
+            std::cout << "Extraction successful" << std::endl;
+            return Result::Success;
+        }
+        catch (const std::exception& e) {
+            std::cout << "Exception: " << e.what() << std::endl;
+            return Result::ZipError;
+        }
+        catch (...) {
+            std::cout << "Unknown exception" << std::endl;
+            return Result::ZipError;
+        }
+    }
+
+    Result extractExe(const std::string& gameDir) {
+        if (gameDir.empty()) {
+            return Result::InvalidGamePath;
+        }
+
+        fs::path gamePath = fs::path(gameDir);
+        fs::path gameExePath = gamePath / "BlackOps4.exe";
+
+        std::cout << "Initial game path: " << gamePath.string() << std::endl;
+        std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
+
+        if (!fs::exists(gameExePath)) {
+            fs::path parentPath = gamePath.parent_path().parent_path();
+            gameExePath = parentPath / "BlackOps4.exe";
+
+            std::cout << "Trying parent path: " << parentPath.string() << std::endl;
+            std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
+
+            if (!fs::exists(gameExePath)) {
+                std::cout << "Game exe not found at parent path either" << std::endl;
+                return Result::InvalidGamePath;
+            }
+
+            gamePath = parentPath;
+            std::cout << "Updated game path to: " << gamePath.string() << std::endl;
+        }
+
+        fs::path launcherDir = gamePath / "project-bo4" / "launcher";
+        fs::path zipPath = launcherDir / "exe.zip";
+        std::cout << "Looking for zip at: " << zipPath.string() << std::endl;
+        std::cout << "File exists: " << (fs::exists(zipPath) ? "Yes" : "No") << std::endl;
+
+        if (!fs::exists(zipPath)) {
+            return Result::FileNotFound;
+        }
+
+        uint32_t zipExeCrc = 0;
+        uint32_t existingExeCrc = 0;
+        if (getZipEntryCrc32(zipPath, "BlackOps4.exe", zipExeCrc) &&
+            computeFileCrc32(gameExePath, existingExeCrc) &&
+            zipExeCrc == existingExeCrc) {
+            std::cout << "BlackOps4.exe already up to date, skipping extraction" << std::endl;
+            return Result::Success;
+        }
+
+        try {
+            std::string extractCmd = "powershell -Command \"";
+            extractCmd += "Expand-Archive -Path '" + zipPath.string() + "' -DestinationPath '" + gamePath.string() + "' -Force";
+            extractCmd += "\"";
+
+            std::cout << "Executing extraction command: " << extractCmd << std::endl;
+
+            int result = system(extractCmd.c_str());
+            if (result != 0) {
+                std::cout << "Extraction failed with code: " << result << std::endl;
+                return Result::ZipError;
+            }
+
+            if (!fs::exists(gameExePath)) {
+                std::cout << "Exe was not extracted successfully" << std::endl;
+                return Result::FileNotFound;
+            }
+
             std::cout << "Extraction successful" << std::endl;
             return Result::Success;
         }
