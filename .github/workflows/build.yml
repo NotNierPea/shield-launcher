@@ -63,6 +63,15 @@ jobs:
             }
           }
 
+          # the client refuses to start without project-bo4/zone/support.ff and
+          # project-bo4/internals/T8ShieldSupport, and they only come from here
+          $support = "project-bo4/Latest-Release-Files/project-bo4"
+          foreach ($item in @("zone", "zone_mods", "internals", "music_manager")) {
+            if (Test-Path "$support/$item") {
+              Copy-Item "$support/$item" "$out/project-bo4" -Recurse
+            }
+          }
+
           Compress-Archive -Path $out -DestinationPath dist/Project_BO4_Launcher_Windows.zip
 
       - uses: actions/upload-artifact@v4
@@ -100,6 +109,13 @@ jobs:
           done
           for item in launcher-config.json project-bo4.json; do
             if [ -f "$resources/$item" ]; then cp "$resources/$item" "$out/project-bo4/launcher/"; fi
+          done
+
+          # the client refuses to start without project-bo4/zone/support.ff and
+          # project-bo4/internals/T8ShieldSupport, and they only come from here
+          support=project-bo4/Latest-Release-Files/project-bo4
+          for item in zone zone_mods internals music_manager; do
+            if [ -d "$support/$item" ]; then cp -r "$support/$item" "$out/project-bo4/"; fi
           done
 
           tar -czf dist/Project_BO4_Launcher_Linux.tar.gz -C dist Project_BO4_Launcher_Linux
