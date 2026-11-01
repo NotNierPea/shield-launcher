@@ -7,14 +7,16 @@ namespace DllLoading {
         Success,
         FileNotFound,
         InvalidGamePath,
-        ZipError
+        ZipError,
+        CopyError
     };
 
     bool isGameRunning();
 
-    Result extractDlls(const std::string& gameDir, bool isOnline, bool reshadeEnabled);
+    Result copyClientDll(const std::string& launcherDir);
 
     Result extractExe(const std::string& gameDir);
 
-    bool launchGame(const std::string& gameExePath, bool isOnline);
+    // flags start with a space, " -dedicated"
+    bool launchGame(const std::string& gameExePath, const std::string& gameFlags = " -zombies");
 }

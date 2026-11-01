@@ -1,0 +1,2 @@
+For music manager in-game:
+mp3/wav formats, with correct names!

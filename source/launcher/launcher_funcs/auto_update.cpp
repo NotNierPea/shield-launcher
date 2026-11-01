@@ -8,12 +8,10 @@
 #pragma comment(lib, "wininet.lib")
 #include "configuration.hpp"
 #include "debugging/serverlog.hpp"
-#include <QtWidgets/QMessageBox>
-#include <QtWidgets/QWidget>
 #include <filesystem>
 
 namespace updater {
-    const std::string SERVER_VERSION = "1.1.1";
+    const std::string SERVER_VERSION = "1.1.2";
 
     const std::string GITHUB_API_URL = "https://api.github.com/repos/NotNierPea/shield-launcher/releases/latest";
     const std::string DOWNLOAD_URL_BASE = "https://github.com/NotNierPea/shield-launcher/releases/download/";
@@ -188,40 +186,15 @@ namespace updater {
         return SERVER_VERSION;
     }
 
-    bool check_and_prompt_for_updates(QWidget* parent) {
-        if (check_for_updates()) {
-            std::string latestVersion = utils::configuration::ReadString("UpdateInfo", "LatestVersion", "release");
-            std::string assetName = utils::configuration::ReadString("UpdateInfo", "AssetName", "");
-
-            utils::configuration::WriteString("UpdateInfo", "LastPromptedVersion", assetName);
-
-            QMessageBox msgBox(parent);
-            msgBox.setWindowTitle("Update Available");
-            msgBox.setText(QString("A new version (%1) is available. Your current version is %2.")
-                .arg(QString::fromStdString(latestVersion))
-                .arg(QString::fromStdString(SERVER_VERSION)));
-            msgBox.setInformativeText("Do you want to update now?");
-            msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-            msgBox.setDefaultButton(QMessageBox::Yes);
-
-            int ret = msgBox.exec();
-
-            if (ret == QMessageBox::Yes) {
-                logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER, "User chose to update now");
-                download_and_update();
-                return true;
-            }
-            else {
-                logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER, "User chose to skip update");
-                return false;
-            }
-        }
-
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER, "No updates available");
-        return false;
+    void mark_prompted() {
+        utils::configuration::WriteString("UpdateInfo", "LastPromptedVersion", utils::configuration::ReadString("UpdateInfo", "AssetName", ""));
     }
 
-    void download_and_update() {
+    std::string get_latest_version() {
+        return utils::configuration::ReadString("UpdateInfo", "LatestVersion", "release");
+    }
+
+    bool download_and_update() {
         std::string latestVersion = utils::configuration::ReadString("UpdateInfo", "LatestVersion", "release");
         std::string assetName = utils::configuration::ReadString("UpdateInfo", "AssetName", "Project_BO4_Launcher_Update_1.0.18.1.zip");
         logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER, "Starting update process to version %s", latestVersion.c_str());
@@ -257,14 +230,14 @@ namespace updater {
         HINTERNET hInternet = InternetOpenA("BO4-Launcher-Updater", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
         if (!hInternet) {
             logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to initialize WinINet for download");
-            return;
+            return false;
         }
 
         HINTERNET hConnect = InternetOpenUrlA(hInternet, downloadUrl.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
         if (!hConnect) {
             logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to connect to download URL");
             InternetCloseHandle(hInternet);
-            return;
+            return false;
         }
 
         HANDLE hFile = CreateFileA(zipPath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -272,7 +245,7 @@ namespace updater {
             logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to create update zip file");
             InternetCloseHandle(hConnect);
             InternetCloseHandle(hInternet);
-            return;
+            return false;
         }
 
         char buffer[8192];
@@ -293,7 +266,7 @@ namespace updater {
 
         if (!std::filesystem::exists(zipPath)) {
             logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Download failed - zip file not found");
-            return;
+            return false;
         }
 
         logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Download complete. Extracting files...");
@@ -369,14 +342,11 @@ namespace updater {
 
         if (ShellExecuteExA(&sei)) {
             logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Update script started successfully");
-
-            Sleep(1000);
-
-            exit(0);
+            return true;
         }
-        else {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE,
-                "[ERROR] Failed to start update script. Error code: %d", GetLastError());
-        }
+
+        logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE,
+            "[ERROR] Failed to start update script. Error code: %d", GetLastError());
+        return false;
     }
 }

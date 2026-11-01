@@ -7,7 +7,6 @@
 #include <vector>
 #include <cstdint>
 #include <zlib.h>
-#include <QCoreApplication>
 #include <thread>
 #include <atomic>
 
@@ -185,12 +184,12 @@ namespace DllLoading {
         return found;
     }
 
-    Result extractDlls(const std::string& gameDir, bool isOnline, bool reshadeEnabled) {
-        if (gameDir.empty()) {
+    Result copyClientDll(const std::string& launcherDir) {
+        if (launcherDir.empty()) {
             return Result::InvalidGamePath;
         }
 
-        fs::path gamePath = fs::path(gameDir);
+        fs::path gamePath = fs::path(launcherDir);
         fs::path gameExePath = gamePath / "BlackOps4.exe";
         
         std::cout << "Initial game path: " << gamePath.string() << std::endl;
@@ -212,17 +211,12 @@ namespace DllLoading {
             std::cout << "Updated game path to: " << gamePath.string() << std::endl;
         }
 
-        fs::path launcherDir = gamePath / "project-bo4" / "launcher";
-        std::cout << "Launcher directory: " << launcherDir.string() << std::endl;
-        
-        fs::path zipPath = launcherDir / (isOnline ? "mp.zip" : "solo.zip");
-        std::cout << "Looking for zip at: " << zipPath.string() << std::endl;
-        std::cout << "File exists: " << (fs::exists(zipPath) ? "Yes" : "No") << std::endl;
-        
-        if (!fs::exists(zipPath)) {
+        fs::path sourceDll = fs::path(launcherDir) / "XInput9_1_0.dll";
+        std::cout << "Looking for client dll at: " << sourceDll.string() << std::endl;
+
+        if (!fs::exists(sourceDll)) {
             return Result::FileNotFound;
         }
-
 
         // Note: not needed anymore cause of ATE47's plugin now loading zone from project-bo4/zone
 
@@ -270,46 +264,26 @@ namespace DllLoading {
 
         fs::path dllPath = gamePath / "XInput9_1_0.dll";
 
-        uint32_t zipDllCrc = 0;
+        // same file skips the copy, a running game keeps the dll locked
+        uint32_t sourceDllCrc = 0;
         uint32_t existingDllCrc = 0;
         if (fs::exists(dllPath) &&
-            getZipEntryCrc32(zipPath, "XInput9_1_0.dll", zipDllCrc) &&
+            computeFileCrc32(sourceDll, sourceDllCrc) &&
             computeFileCrc32(dllPath, existingDllCrc) &&
-            zipDllCrc == existingDllCrc) {
-            std::cout << "XInput9_1_0.dll already up to date, skipping extraction" << std::endl;
+            sourceDllCrc == existingDllCrc) {
+            std::cout << "XInput9_1_0.dll already up to date, skipping copy" << std::endl;
             return Result::Success;
         }
 
-        try {
-            std::string extractCmd = "powershell -Command \"";
-            extractCmd += "Expand-Archive -Path '" + zipPath.string() + "' -DestinationPath '" + gamePath.string() + "' -Force";
-            extractCmd += "\"";
-            
-            std::cout << "Executing extraction command: " << extractCmd << std::endl;
-            
-            int result = system(extractCmd.c_str());
-            if (result != 0) {
-                std::cout << "Extraction failed with code: " << result << std::endl;
-                return Result::ZipError;
-            }
-            
-            fs::path extractedDll = gamePath / "XInput9_1_0.dll";
-            if (!fs::exists(extractedDll)) {
-                std::cout << "DLL was not extracted successfully" << std::endl;
-                return Result::FileNotFound;
-            }
-            
-            std::cout << "Extraction successful" << std::endl;
-            return Result::Success;
+        std::error_code ec;
+        fs::copy_file(sourceDll, dllPath, fs::copy_options::overwrite_existing, ec);
+        if (ec) {
+            std::cout << "Failed to copy XInput9_1_0.dll: " << ec.message() << std::endl;
+            return Result::CopyError;
         }
-        catch (const std::exception& e) {
-            std::cout << "Exception: " << e.what() << std::endl;
-            return Result::ZipError;
-        }
-        catch (...) {
-            std::cout << "Unknown exception" << std::endl;
-            return Result::ZipError;
-        }
+
+        std::cout << "Copied XInput9_1_0.dll to: " << dllPath.string() << std::endl;
+        return Result::Success;
     }
 
     Result extractExe(const std::string& gameDir) {
@@ -439,15 +413,13 @@ namespace DllLoading {
         cleanupThreadRunning = false;
     }
 
-    bool launchGame(const std::string& gameExePath, bool isOnline) {
-        std::cout << "Launching game: " << gameExePath << (isOnline ? " -multiplayer" : " -zombies") << std::endl;
-        
+    bool launchGame(const std::string& gameExePath, const std::string& gameFlags) {
+        std::cout << "Launching game: " << gameExePath << gameFlags << std::endl;
+
         fs::path gameDir = fs::path(gameExePath).parent_path();
         std::string gameDirStr = gameDir.string();
-        
+
         gameDirectoryForCleanup = gameDirStr;
-        
-        std::string gameFlags = isOnline ? " -multiplayer" : " -zombies";
         
         SHELLEXECUTEINFOA shExInfo = {0};
         shExInfo.cbSize = sizeof(SHELLEXECUTEINFOA);

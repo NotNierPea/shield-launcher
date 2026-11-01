@@ -1,0 +1,5 @@
+// the launcher page, served from the exe by launcher_main.cpp
+UI_INDEX RCDATA "ui/index.html"
+UI_STYLE RCDATA "ui/style.css"
+UI_APP   RCDATA "ui/app.js"
+UI_ICON  RCDATA "icon.ico"

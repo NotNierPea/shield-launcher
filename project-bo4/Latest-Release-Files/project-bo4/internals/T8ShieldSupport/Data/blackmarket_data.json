@@ -1,0 +1,703 @@
+{
+  "_comment": "Black market data tables. bribes maps a loot rule to the weapon it grants, the bribe name IsBribeMenu looks up, and the id CanPurchaseBribe checks for one-time offers. costs holds what an opening spends, since the request only ever names the currency and never the amount.",
+  "bribes": {
+    "57": {
+      "item": "280174596",
+      "stream": "ar_peacekeeper_t8_bribe",
+      "bribeId": "900252193"
+    },
+    "58": {
+      "item": "241496474",
+      "stream": "ar_an94_t8_bribe",
+      "bribeId": "900330383"
+    },
+    "59": {
+      "item": "242625617",
+      "stream": "ar_doublebarrel_t8_bribe",
+      "bribeId": "900234001"
+    },
+    "60": {
+      "item": "258944114",
+      "stream": "smg_vmp_t8_bribe",
+      "bribeId": "900096570"
+    },
+    "61": {
+      "item": "225240800",
+      "stream": "smg_minigun_t8_bribe",
+      "bribeId": "900033558"
+    },
+    "62": {
+      "item": "285207028",
+      "stream": "tr_flechette_t8_bribe",
+      "bribeId": "900229354"
+    },
+    "63": {
+      "item": "243893158",
+      "stream": "tr_damageburst_t8_bribe",
+      "bribeId": "900359153"
+    },
+    "64": {
+      "item": "227839604",
+      "stream": "sniper_damagesemi_t8_bribe",
+      "bribeId": "900027619"
+    },
+    "65": {
+      "item": "274346671",
+      "stream": "sniper_locus_t8_bribe",
+      "bribeId": "900171308"
+    },
+    "66": {
+      "item": "201575192",
+      "stream": "shotgun_precision_t8_bribe",
+      "bribeId": "900334017"
+    },
+    "67": {
+      "item": "289738924",
+      "stream": "special_ballisticknife_t8_dw_bribe",
+      "bribeId": "900272945"
+    },
+    "68": {
+      "item": "298474389",
+      "stream": "special_crossbow_t8_bribe",
+      "bribeId": "900076684"
+    },
+    "69": {
+      "item": "271447873",
+      "stream": "melee_amuletfist_t8_bribe",
+      "bribeId": "900232842"
+    },
+    "70": {
+      "item": "233839238",
+      "stream": "loot_ar_damage_mk2_bribe",
+      "bribeId": "900426508"
+    },
+    "71": {
+      "item": "247106891",
+      "stream": "loot_ar_stealth_mk2_bribe",
+      "bribeId": "900448291"
+    },
+    "72": {
+      "item": "224915041",
+      "stream": "loot_ar_standard_mk2_bribe",
+      "bribeId": "900185672"
+    },
+    "73": {
+      "item": "284592688",
+      "stream": "loot_ar_peacekeeper_mk2_bribe",
+      "bribeId": "900139909"
+    },
+    "74": {
+      "item": "289523769",
+      "stream": "loot_smg_fastfire_mk2_bribe",
+      "bribeId": "900491729"
+    },
+    "75": {
+      "item": "275985373",
+      "stream": "loot_smg_capacity_mk2_bribe",
+      "bribeId": "900040654"
+    },
+    "76": {
+      "item": "269559536",
+      "stream": "loot_smg_handling_mk2_bribe",
+      "bribeId": "900133187"
+    },
+    "77": {
+      "item": "238317979",
+      "stream": "loot_smg_burst_mk2_bribe",
+      "bribeId": "900072429"
+    },
+    "78": {
+      "item": "251040964",
+      "stream": "loot_dlc_breifcase_smg_mk2_bribe",
+      "bribeId": "900285745"
+    },
+    "79": {
+      "item": "283851516",
+      "stream": "loot_tr_flechette_mk2_bribe",
+      "bribeId": "900395539"
+    },
+    "80": {
+      "item": "262367089",
+      "stream": "loot_lmg_heavy_mk2_bribe",
+      "bribeId": "900147711"
+    },
+    "81": {
+      "item": "219289682",
+      "stream": "loot_lmg_mark_48_seal_mk2_bribe",
+      "bribeId": "900037466"
+    },
+    "82": {
+      "item": "205757857",
+      "stream": "loot_sniper_quickscope_mk2_bribe",
+      "bribeId": "900271964"
+    },
+    "83": {
+      "item": "211692971",
+      "stream": "loot_dlc_mini_14_mk2_bribe",
+      "bribeId": "900306451"
+    },
+    "84": {
+      "item": "276534126",
+      "stream": "loot_pistol_revolver_mk2_bribe",
+      "bribeId": "900003167"
+    },
+    "85": {
+      "item": "231091219",
+      "stream": "loot_pistol_fullauto_mk2_bribe",
+      "bribeId": "900283289"
+    },
+    "86": {
+      "item": "283359387",
+      "stream": "loot_shotgun_pump_mk2_bribe",
+      "bribeId": "900294694"
+    },
+    "87": {
+      "item": "234436563",
+      "stream": "loot_dlc_full_autoshotgun_mk2_bribe",
+      "bribeId": "900013815"
+    },
+    "88": {
+      "item": "208854822",
+      "stream": "loot_shotgun_semi_sig_01_bribe",
+      "bribeId": "900114573"
+    },
+    "89": {
+      "item": "244236944",
+      "stream": "camo_active_sig_ar_modular_porcelain_base_bribe",
+      "bribeId": "900098876"
+    },
+    "90": {
+      "item": "281483511",
+      "stream": "camo_active_sig_ar_standard_adventure_base_bribe",
+      "bribeId": "900369663"
+    },
+    "91": {
+      "item": "298071754",
+      "stream": "camo_active_sig_smg_fastburst_diy_base_bribe",
+      "bribeId": "900394779"
+    },
+    "92": {
+      "item": "234220492",
+      "stream": "camo_active_sig_tr_flechette_rivermonster_base_bribe",
+      "bribeId": "900143956"
+    },
+    "93": {
+      "item": "254523307",
+      "stream": "camo_active_sig_sniper_fastrechamber_western_base_bribe",
+      "bribeId": "900164037"
+    },
+    "94": {
+      "item": "232608576",
+      "stream": "camo_active_sig_pistol_burst_raven_base_bribe",
+      "bribeId": "900437949"
+    },
+    "95": {
+      "item": "229095075",
+      "stream": "camo_active_sig_pistol_revolver_cyberpunk_base_bribe",
+      "bribeId": "900297388"
+    },
+    "96": {
+      "item": "253356058",
+      "stream": "camo_active_sig_pistol_fullauto_arcade_base_bribe",
+      "bribeId": "900484103"
+    },
+    "97": {
+      "item": "232096031",
+      "stream": "camo_active_sig_shotgun_fullauto_construction_base_bribe",
+      "bribeId": "900045616"
+    },
+    "98": {
+      "item": "121455251",
+      "stream": "smg_fastburst_t8_bribe",
+      "bribeId": "900254803"
+    },
+    "99": {
+      "item": "110830029",
+      "stream": "ar_standard_t8_bribe",
+      "bribeId": "900466481"
+    },
+    "100": {
+      "item": "101234166",
+      "stream": "shotgun_fullauto_t8_bribe",
+      "bribeId": "900420549"
+    },
+    "101": {
+      "item": "173696207",
+      "stream": "smg_folding_t8_bribe",
+      "bribeId": "900451751"
+    },
+    "102": {
+      "item": "114053909",
+      "stream": "lmg_stealth_t8_bribe",
+      "bribeId": "900173665"
+    },
+    "103": {
+      "item": "384248841",
+      "stream": "pistol_fullauto_t8_bribe",
+      "bribeId": "900433396"
+    },
+    "104": {
+      "item": "196137356",
+      "stream": "sniper_mini14_t8_bribe",
+      "bribeId": "900392902"
+    },
+    "106": {
+      "item": "280174596",
+      "stream": "ar_peacekeeper_t8_bribe_free",
+      "bribeId": "900350746"
+    },
+    "107": {
+      "item": "241496474",
+      "stream": "ar_an94_t8_bribe_free",
+      "bribeId": "900189744"
+    },
+    "108": {
+      "item": "242625617",
+      "stream": "ar_doublebarrel_t8_bribe_free",
+      "bribeId": "900472197"
+    },
+    "109": {
+      "item": "258944114",
+      "stream": "smg_vmp_t8_bribe_free",
+      "bribeId": "900477994"
+    },
+    "110": {
+      "item": "225240800",
+      "stream": "smg_minigun_t8_bribe_free",
+      "bribeId": "900083881"
+    },
+    "111": {
+      "item": "285207028",
+      "stream": "tr_flechette_t8_bribe_free",
+      "bribeId": "900219345"
+    },
+    "112": {
+      "item": "243893158",
+      "stream": "tr_damageburst_t8_bribe_free",
+      "bribeId": "900067458"
+    },
+    "113": {
+      "item": "227839604",
+      "stream": "sniper_damagesemi_t8_bribe_free",
+      "bribeId": "900090025"
+    },
+    "114": {
+      "item": "274346671",
+      "stream": "sniper_locus_t8_bribe_free",
+      "bribeId": "900045296"
+    },
+    "115": {
+      "item": "201575192",
+      "stream": "shotgun_precision_t8_bribe_free",
+      "bribeId": "900231741"
+    },
+    "116": {
+      "item": "289738924",
+      "stream": "special_ballisticknife_t8_dw_bribe_free",
+      "bribeId": "900403613"
+    },
+    "117": {
+      "item": "298474389",
+      "stream": "special_crossbow_t8_bribe_free",
+      "bribeId": "900401554"
+    },
+    "118": {
+      "item": "271447873",
+      "stream": "melee_amuletfist_t8_bribe_free",
+      "bribeId": "900169029"
+    },
+    "119": {
+      "item": "233839238",
+      "stream": "loot_ar_damage_mk2_bribe_free",
+      "bribeId": "900267917"
+    },
+    "120": {
+      "item": "247106891",
+      "stream": "loot_ar_stealth_mk2_bribe_free",
+      "bribeId": "900325838"
+    },
+    "121": {
+      "item": "224915041",
+      "stream": "loot_ar_standard_mk2_bribe_free",
+      "bribeId": "900190989"
+    },
+    "122": {
+      "item": "284592688",
+      "stream": "loot_ar_peacekeeper_mk2_bribe_free",
+      "bribeId": "900385516"
+    },
+    "123": {
+      "item": "289523769",
+      "stream": "loot_smg_fastfire_mk2_bribe_free",
+      "bribeId": "900334549"
+    },
+    "124": {
+      "item": "275985373",
+      "stream": "loot_smg_capacity_mk2_bribe_free",
+      "bribeId": "900201633"
+    },
+    "125": {
+      "item": "269559536",
+      "stream": "loot_smg_handling_mk2_bribe_free",
+      "bribeId": "900192011"
+    },
+    "126": {
+      "item": "238317979",
+      "stream": "loot_smg_burst_mk2_bribe_free",
+      "bribeId": "900141037"
+    },
+    "127": {
+      "item": "251040964",
+      "stream": "loot_dlc_breifcase_smg_mk2_bribe_free",
+      "bribeId": "900224133"
+    },
+    "128": {
+      "item": "283851516",
+      "stream": "loot_tr_flechette_mk2_bribe_free",
+      "bribeId": "900478272"
+    },
+    "129": {
+      "item": "262367089",
+      "stream": "loot_lmg_heavy_mk2_bribe_free",
+      "bribeId": "900187377"
+    },
+    "130": {
+      "item": "219289682",
+      "stream": "loot_lmg_mark_48_seal_mk2_bribe_free",
+      "bribeId": "900086835"
+    },
+    "131": {
+      "item": "205757857",
+      "stream": "loot_sniper_quickscope_mk2_bribe_free",
+      "bribeId": "900038618"
+    },
+    "132": {
+      "item": "211692971",
+      "stream": "loot_dlc_mini_14_mk2_bribe_free",
+      "bribeId": "900083059"
+    },
+    "133": {
+      "item": "276534126",
+      "stream": "loot_pistol_revolver_mk2_bribe_free",
+      "bribeId": "900177251"
+    },
+    "134": {
+      "item": "231091219",
+      "stream": "loot_pistol_fullauto_mk2_bribe_free",
+      "bribeId": "900492227"
+    },
+    "135": {
+      "item": "283359387",
+      "stream": "loot_shotgun_pump_mk2_bribe_free",
+      "bribeId": "900384787"
+    },
+    "136": {
+      "item": "234436563",
+      "stream": "loot_dlc_full_autoshotgun_mk2_bribe_free",
+      "bribeId": "900192032"
+    },
+    "137": {
+      "item": "208854822",
+      "stream": "loot_shotgun_semi_sig_01_bribe_free",
+      "bribeId": "900233070"
+    },
+    "138": {
+      "item": "244236944",
+      "stream": "camo_active_sig_ar_modular_porcelain_base_bribe_free",
+      "bribeId": "900372961"
+    },
+    "139": {
+      "item": "281483511",
+      "stream": "camo_active_sig_ar_standard_adventure_base_bribe_free",
+      "bribeId": "900131559"
+    },
+    "140": {
+      "item": "298071754",
+      "stream": "camo_active_sig_smg_fastburst_diy_base_bribe_free",
+      "bribeId": "900380133"
+    },
+    "141": {
+      "item": "234220492",
+      "stream": "camo_active_sig_tr_flechette_rivermonster_base_bribe_free",
+      "bribeId": "900449022"
+    },
+    "142": {
+      "item": "254523307",
+      "stream": "camo_active_sig_sniper_fastrechamber_western_base_bribe_free",
+      "bribeId": "900197958"
+    },
+    "143": {
+      "item": "232608576",
+      "stream": "camo_active_sig_pistol_burst_raven_base_bribe_free",
+      "bribeId": "900428653"
+    },
+    "144": {
+      "item": "229095075",
+      "stream": "camo_active_sig_pistol_revolver_cyberpunk_base_bribe_free",
+      "bribeId": "900133935"
+    },
+    "145": {
+      "item": "253356058",
+      "stream": "camo_active_sig_pistol_fullauto_arcade_base_bribe_free",
+      "bribeId": "900282023"
+    },
+    "146": {
+      "item": "232096031",
+      "stream": "camo_active_sig_shotgun_fullauto_construction_base_bribe_free",
+      "bribeId": "900396565"
+    },
+    "147": {
+      "item": "121455251",
+      "stream": "smg_fastburst_t8_bribe_free",
+      "bribeId": "900375974"
+    },
+    "148": {
+      "item": "110830029",
+      "stream": "ar_standard_t8_bribe_free",
+      "bribeId": "900257127"
+    },
+    "149": {
+      "item": "101234166",
+      "stream": "shotgun_fullauto_t8_bribe_free",
+      "bribeId": "900059163"
+    },
+    "150": {
+      "item": "173696207",
+      "stream": "smg_folding_t8_bribe_free",
+      "bribeId": "900389613"
+    },
+    "151": {
+      "item": "114053909",
+      "stream": "lmg_stealth_t8_bribe_free",
+      "bribeId": "900473810"
+    },
+    "152": {
+      "item": "384248841",
+      "stream": "pistol_fullauto_t8_bribe_free",
+      "bribeId": "900243369"
+    },
+    "153": {
+      "item": "196137356",
+      "stream": "sniper_mini14_t8_bribe_free",
+      "bribeId": "900273526"
+    }
+  },
+  "costs": {
+    "50": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "51": {
+      "currency": "500163",
+      "amount": 6
+    },
+    "53": {
+      "currency": "500163",
+      "amount": 1
+    },
+    "54": {
+      "currency": "500161",
+      "amount": 1
+    },
+    "55": {
+      "currency": "500165",
+      "amount": 1
+    },
+    "105": {
+      "currency": "500163",
+      "amount": 6
+    },
+    "57": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "58": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "59": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "60": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "61": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "62": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "63": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "64": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "65": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "66": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "67": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "68": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "69": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "70": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "71": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "72": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "73": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "74": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "75": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "76": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "77": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "78": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "79": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "80": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "81": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "82": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "83": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "84": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "85": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "86": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "87": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "88": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "89": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "90": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "91": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "92": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "93": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "94": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "95": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "96": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "97": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "98": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "99": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "100": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "101": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "102": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "103": {
+      "currency": "500163",
+      "amount": 50
+    },
+    "104": {
+      "currency": "500163",
+      "amount": 50
+    }
+  }
+}

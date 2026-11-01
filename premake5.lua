@@ -30,9 +30,30 @@ end
 
 newoption {
 	trigger = "copy-to",
-	description = "Optional, copy the EXE to a custom folder after build, define the path here if wanted.",
+	description = "Optional, the BO4 game folder release builds also copy the exes into (or set SHIELD_BO4_DIR).",
 	value = "PATH"
 }
+
+-- release builds copy their exe into the release files, and into the BO4 folder when one is set
+local release_files_dir = path.getabsolute("project-bo4/Latest-Release-Files")
+local bo4_dir = _OPTIONS["copy-to"] or os.getenv("SHIELD_BO4_DIR")
+
+function copy_build_to(subdir)
+	local function copy_cmds(root)
+		local dest = path.translate(subdir ~= "" and path.join(root, subdir) or root, "\\")
+		return {
+			'if not exist "' .. dest .. '" mkdir "' .. dest .. '"',
+			'copy /B /Y "$(TargetPath)" "' .. dest .. '\\$(TargetFileName)" > nul',
+		}
+	end
+
+	filter "configurations:Release"
+		postbuildcommands(copy_cmds(release_files_dir))
+		if bo4_dir then
+			postbuildcommands(copy_cmds(bo4_dir))
+		end
+	filter {}
+end
 
 newoption {
 	trigger = "dev-build",
@@ -112,7 +133,7 @@ project "utilities"
 	dependencies.imports()
 	
 	
--- Define the server project
+-- the launcher, a WebView2 window whose page is built into the exe from source/launcher/ui
 project "launcher"
     kind "WindowedApp"
     language "C++"
@@ -126,43 +147,44 @@ project "launcher"
     {
         "source/launcher",
         "source/utilities", 
-	    "build/src/", -- for pre generated qt moc files [NEEDED]
         "%{prj.location}/source"
     }
 
     files 
     {
         "./source/launcher/resources.rc",
+        "./source/launcher/ui.rc",
         "./source/launcher/**.hpp",
         "./source/launcher/**.cpp",
         "./source/launcher/**.h",
-        "./source/launcher/**.ui",
-        "./source/launcher/**.qrc",
         "./source/launcher/**.ico",
         "./source/launcher/**.manifest",
-        "build/src/**.cpp"
+        "./source/launcher/ui/**"
     }
 
     links {
         "utilities",  -- Links with utilities
     }
-	
-    postbuildcommands {
- 
+
+    -- VS restores the SDK on build, the static loader keeps WebView2Loader.dll out of the release
+    local webview2_version = "1.0.4191.47"
+    nuget { "Microsoft.Web.WebView2:" .. webview2_version }
+
+    -- premake imports build\Common.targets directly, so set what the package's native wrapper would
+    vsprops {
+        WebView2ProjectKind = "native",
+        NugetRoot = "$(MSBuildProjectDirectory)\\packages\\Microsoft.Web.WebView2." .. webview2_version .. "\\",
+        WebView2LoaderPreference = "Static"
     }
 
-    -- Apply precompiled headers to moc files
-    --filter "files:src/launcher/launcher/**.cpp"
-    filter "files:src/launcher/main/**.cpp"
-    -- pchheader "std_include.hpp"
-    -- pchsource "src/launcher/std_include.cpp"
+    -- ui edits only touch ui.rc's inputs, so let MSBuild decide instead of the fast check
+    fastuptodate "Off"
 
-    filter {}
-	
-	
-	qt6.run_moc()  -- Func to run moc NEEDED this builds the moc file (moc is in qt.lua)
+    -- building the launcher also builds (and copies) the shortcut
+    dependson { "launcher_shortcut" }
 
-	
+    copy_build_to("project-bo4/launcher")
+
     dependencies.imports()
 
 group "Dependencies"
@@ -187,11 +209,11 @@ project "launcher_shortcut"
         "source/launcher_shortcut"
     }
     
-    -- Copy the shortcut executable to the root directory after build
-    postbuildcommands {
-        "{COPY} \"%{cfg.buildtarget.abspath}\" \"%{wks.location}/../../\""
-    }
-    
+    -- VS skips up to date projects and their post-build, so the copy would never run
+    fastuptodate "Off"
+
+    copy_build_to("")
+
     filter "configurations:Release"
         optimize "Size"
         defines {"NDEBUG"}

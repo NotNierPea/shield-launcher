@@ -24,7 +24,6 @@
 #pragma warning(disable: 28020)
 
 
-
 #define WIN32_LEAN_AND_MEAN
 
 #include <Windows.h>
@@ -78,80 +77,6 @@
 #include <variant>
 #include <fstream>
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QMessageBox>
-#include <QIcon>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QLineEdit>
-#include <QTimer>
-#include <QSpacerItem>
-#include <QSizePolicy>
-
-
-#include <QMainWindow>
-#include <QPushButton>
-#include <QCheckBox>
-#include <QLabel>
-#include <QSlider>
-#include <QProgressBar>
-#include <QComboBox>
-#include <QMessageBox>
-
-#include <QtWidgets/QApplication>
-#include <QtWidgets/QVBoxLayout>
-#include <QtWidgets/QHBoxLayout>
-#include <QtWidgets/QGridLayout>
-#include <QtWidgets/QLabel>
-#include <QtWidgets/QLineEdit>
-#include <QtWidgets/QPushButton>
-#include <QtWidgets/QProgressBar>
-#include <QtWidgets/QTextEdit>
-#include <QtWidgets/QGroupBox>
-#include <QtWidgets/QMessageBox>
-#include <QtWidgets/QFileDialog>
-#include <QtWidgets/QTabWidget>
-#include <QtWidgets/QTreeWidget>
-#include <QtWidgets/QStyledItemDelegate>
-
-#include <QtCore/QObject>
-#include <QtCore/QString>
-#include <QtCore/QProcess>
-#include <QtCore/QFile>
-#include <QtCore/QDir>
-#include <QtCore/QDebug>
-#include <QtCore/QDirIterator>
-#include <QtCore/QCoreApplication>
-#include <QtCore/QXmlStreamReader>
-#include <QtCore/QXmlStreamWriter>
-#include <QtCore/QRegularExpression>
-#include <QtCore/QVariant>
-#include <QtCore/QMap>
-#include <QtCore/QList>
-#include <QtCore/QByteArray>
-#include <QtCore/QJsonDocument>
-#include <QtCore/QJsonObject>
-#include <QtCore/QJsonArray>
-#include <QtCore/QJsonValue>
-#include <QtCore/QThread>
-#include <QtCore/QMutex>
-#include <QtCore/QWaitCondition>
-#include <QtCore/QReadWriteLock>
-#include <QtCore/QDateTime>
-
-#include <QHeaderView>
-#include <QFileInfo>
-#include <QCheckBox>
-#include <QSpinBox>
-#include <QComboBox>
-#include <QMenu>
-#include <QAction>
-#include <QInputDialog>
-#include <QMouseEvent>
-#include <QDialog>
-
-
 
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
@@ -159,8 +84,6 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/filereadstream.h>
 #include <rapidjson/filewritestream.h>
-
-
 
 
 #pragma warning(pop)
@@ -178,8 +101,6 @@
 //#pragma comment(lib, "glog.lib") 
 
 
-
 using namespace std::literals;
-
 
 
