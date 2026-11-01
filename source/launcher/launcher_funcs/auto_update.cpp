@@ -81,20 +81,25 @@ namespace updater {
 
         // 1.2.0 is newer than 1.1.2, and a fork suffix never counts on its own
         bool is_newer(const std::string& latest, const std::string& current) {
+            // every number counts, not only the dotted release part: "1.1.2-3L0.4" has to
+            // read as newer than "1.1.2-3L0.1", and stopping at the hyphen made them equal
             auto numbers = [](const std::string& version) {
                 std::vector<int> parts;
                 std::string text = version;
                 if (!text.empty() && (text[0] == 'v' || text[0] == 'V'))
                     text = text.substr(1);
 
-                std::stringstream stream(text);
-                for (std::string part; std::getline(stream, part, '.');) {
-                    try {
-                        parts.push_back(std::stoi(part));
+                for (size_t i = 0; i < text.size();) {
+                    if (!std::isdigit(static_cast<unsigned char>(text[i]))) {
+                        ++i;
+                        continue;
                     }
-                    catch (const std::exception&) {
-                        break;
-                    }
+
+                    int value = 0;
+                    while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i])))
+                        value = value * 10 + (text[i++] - '0');
+
+                    parts.push_back(value);
                 }
                 return parts;
             };

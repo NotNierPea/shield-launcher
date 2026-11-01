@@ -4,6 +4,8 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  # called by release.yml, the artifacts of this run are the release files
+  workflow_call:
 
 jobs:
   windows:
