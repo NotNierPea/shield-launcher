@@ -249,10 +249,15 @@ namespace updater {
         shell << "#!/bin/sh\n";
         shell << "while kill -0 " << getpid() << " 2>/dev/null; do sleep 1; done\n";
         shell << "tmp=$(mktemp -d)\n";
-        shell << "tar -xzf " << shell_quote(archive.string()) << " -C \"$tmp\" || exit 1\n";
-        shell << "cp -rf \"$tmp\"/*/. " << shell_quote(exe_dir.string()) << "/ || exit 1\n";
-        shell << "chmod +x " << shell_quote(exe.string()) << "\n";
+        shell << "tar -xzf " << shell_quote(archive.string()) << " -C \"$tmp\" || { rm -rf \"$tmp\" "
+              << shell_quote(archive.string()) << "; exit 1; }\n";
+        shell << "cp -rf \"$tmp\"/*/. " << shell_quote(exe_dir.string()) << "/\n";
+        // the copy can fail on a file the game holds open, the archive still goes away
         shell << "rm -rf \"$tmp\" " << shell_quote(archive.string()) << "\n";
+        shell << "chmod +x " << shell_quote(exe.string()) << "\n";
+        // our own environment would make the new instance think it is a test build
+        shell << "unset SHIELD_LAUNCHER_DEBUG SHIELD_LAUNCHER_DEBUG_JS SHIELD_LAUNCHER_SELFTEST"
+                 " SHIELD_LAUNCHER_SNAPSHOT\n";
         shell << "cd " << shell_quote(exe_dir.string()) << " && " << shell_quote(exe.string()) << " >/dev/null 2>&1 &\n";
         shell.close();
 

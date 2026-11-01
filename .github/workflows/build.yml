@@ -1,7 +1,9 @@
 name: build
 
 on:
+  # branches only: a tag is a release, and release.yml already builds it
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
   # called by release.yml, the artifacts of this run are the release files
