@@ -4,7 +4,7 @@
 - #### Then you can run the ``"Launch Project BO4.exe"``, Click Play Client to launch the game with the client, or Play Vanilla for the unmodded game.
 
 ## Info
-- #### The launcher was not developed by me, i just maintain it and improve it.
+- #### The launcher was not originally developed by me, i just maintain it and improve it.
 - #### Also contains the support mod files and dlls for the latest version of client. 
 - #### For any help or troubleshooting, join our [discord server](https://discord.gg/AXECAzJJGU).
 - #### [Shield Documentation](https://shield-client.gitbook.io/shield-documentation)
