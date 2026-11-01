@@ -162,6 +162,14 @@ project "launcher"
         "./source/launcher/ui/**"
     }
 
+    -- the linux host and its wine launcher are built by CMake with Qt WebEngine,
+    -- this solution is the Windows one
+    removefiles
+    {
+        "./source/launcher/launcher_main/launcher_main_linux.cpp",
+        "./source/launcher/launcher_funcs/linux_run.cpp"
+    }
+
     links {
         "utilities",  -- Links with utilities
     }

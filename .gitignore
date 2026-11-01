@@ -1,1 +1,3 @@
 /build
+.hermes-tmp/
+tools/premake5

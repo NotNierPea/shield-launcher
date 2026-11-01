@@ -939,3 +939,60 @@ body.opening .dock {
     transition: none !important;
   }
 }
+
+/* mods: one row per installed mod or catalog entry */
+.mod-list {
+  display: grid;
+  gap: 6px;
+}
+
+.mod-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mod-item.disabled {
+  opacity: 0.62;
+}
+
+.mod-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mod-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-text small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.mod-item .btn-ghost {
+  flex: none;
+}
+
+/* a settings row whose control is a field plus a button */
+.path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.path-row .field[readonly] {
+  color: var(--muted);
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+    <gresource prefix="/ui">
+        <file alias="index.html">ui/index.html</file>
+        <file alias="style.css">ui/style.css</file>
+        <file alias="app.js">ui/app.js</file>
+        <file alias="icon.ico">icon.ico</file>
+    </gresource>
+</gresources>

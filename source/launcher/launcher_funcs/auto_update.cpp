@@ -1,352 +1,266 @@
-#include <std_include.hpp>
+#include "std_include.hpp"
 #include "auto_update.hpp"
-#include <rapidjson/document.h>
-#include <rapidjson/writer.h>
-#include <rapidjson/stringbuffer.h>
-#include <wininet.h>
-#include <shlobj.h>
-#pragma comment(lib, "wininet.lib")
-#include "configuration.hpp"
-#include "debugging/serverlog.hpp"
+#include "download.hpp"
+#include "linux_run.hpp"
+#include "../launcher_main/launcher_actions.hpp"
+
+#include <cstdio>
 #include <filesystem>
+#include <sstream>
+
+namespace fs = std::filesystem;
 
 namespace updater {
+    // the launcher's own version, the page shows it next to the title
     const std::string SERVER_VERSION = "1.1.2";
 
     const std::string GITHUB_API_URL = "https://api.github.com/repos/NotNierPea/shield-launcher/releases/latest";
     const std::string DOWNLOAD_URL_BASE = "https://github.com/NotNierPea/shield-launcher/releases/download/";
 
-    bool check_for_updates() {
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Checking GitHub API: %s", GITHUB_API_URL.c_str());
-
-        // Check if we've already prompted for this update
-        std::string lastPromptedVersion = utils::configuration::ReadString("UpdateInfo", "LastPromptedVersion", "");
-
-        HINTERNET hInternet = InternetOpenA("TSTO-Server-Updater", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-        if (!hInternet) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_INITIALIZER, "Failed to initialize WinINet");
-            return false;
+    namespace {
+        // a launcher update is the archive of this platform: the windows one unpacks with
+        // Expand-Archive, the linux one with tar. An asset that is neither is not for us
+        const char* asset_extension() {
+#ifdef _WIN32
+            return ".zip";
+#else
+            return ".tar.gz";
+#endif
         }
 
-        HINTERNET hConnect = InternetOpenUrlA(hInternet, GITHUB_API_URL.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
-        if (!hConnect) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_INITIALIZER, "Failed to connect to GitHub API");
-            InternetCloseHandle(hInternet);
-            return false;
+        bool ends_with(const std::string& text, const std::string& suffix) {
+            return text.size() >= suffix.size()
+                && text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
         }
 
-        char buffer[4096];
-        DWORD bytesRead;
-        std::string response;
-
-        while (InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
-            response.append(buffer, bytesRead);
+        fs::path state_path() {
+            return launcher::launcher_dir() / "update-state.json";
         }
 
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-
-        size_t tagPos = response.find("\"tag_name\":");
-        size_t assetPos = response.find("\"name\":", response.find("\"assets\":"));
-
-        if (tagPos != std::string::npos && assetPos != std::string::npos) {
-            size_t startPos = response.find("\"", tagPos + 11) + 1;
-            size_t endPos = response.find("\"", startPos);
-            std::string latestVersion = response.substr(startPos, endPos - startPos);
-
-            startPos = response.find("\"", assetPos + 7) + 1;
-            endPos = response.find("\"", startPos);
-            std::string assetName = response.substr(startPos, endPos - startPos);
-
-            logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER,
-                "Current version: %s, Latest version: %s, Asset: %s",
-                SERVER_VERSION.c_str(), latestVersion.c_str(), assetName.c_str());
-
-            utils::configuration::WriteString("UpdateInfo", "LatestVersion", latestVersion);
-            utils::configuration::WriteString("UpdateInfo", "AssetName", assetName);
-
-            if (lastPromptedVersion == latestVersion) {
-                logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER,
-                    "Already prompted for version %s, skipping update check", latestVersion.c_str());
+        bool read_state(rapidjson::Document& doc) {
+            std::ifstream file(state_path(), std::ios::binary);
+            if (!file)
                 return false;
-            }
 
-            // Extract version from asset name for special release types
-            if (latestVersion == "alpha" || latestVersion == "beta" || latestVersion == "release" || latestVersion == "Release") {
-                logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER,
-                    "Special release type: %s. Extracting version from asset name: %s",
-                    latestVersion.c_str(), assetName.c_str());
-
-                std::string versionStr;
-                size_t vPos = assetName.find("Update_");
-                if (vPos != std::string::npos) {
-                    size_t startPos = vPos + 7; // Skip "Update_"
-                    size_t endPos = assetName.find(".zip", startPos);
-                    if (endPos != std::string::npos) {
-                        versionStr = assetName.substr(startPos, endPos - startPos);
-                        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER,
-                            "Extracted version string from asset name: %s", versionStr.c_str());
-                    }
-                }
-
-                if (versionStr.empty()) {
-                    logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_INITIALIZER,
-                        "Failed to extract version from asset name");
-                    return false;
-                }
-
-                // If the extracted version matches SERVER_VERSION, no update needed
-                if (versionStr == SERVER_VERSION) {
-                    logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER,
-                        "No update needed - current version is up to date");
-                    logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER,
-                        "Running latest version");
-                    return false;
-                }
-            }
-
-            std::string currentVer = SERVER_VERSION;
-            std::string latestVer = latestVersion;
-            if (currentVer[0] == 'v') currentVer = currentVer.substr(1);
-            if (latestVer[0] == 'v') latestVer = latestVer.substr(1);
-
-            bool isNewer = false;
-            try {
-                float currentNum = std::stof(currentVer);
-                float latestNum = std::stof(latestVer);
-                isNewer = latestNum > currentNum;
-            }
-            catch (const std::exception& e) {
-                logger::write(logger::LOG_LEVEL_WARN, logger::LOG_LABEL_INITIALIZER,
-                    "Float conversion failed for version comparison: %s. Falling back to string comparison.", e.what());
-
-                std::vector<std::string> currentParts;
-                std::vector<std::string> latestParts;
-
-                std::string currentVerCopy = currentVer;
-                size_t pos = 0;
-                while ((pos = currentVerCopy.find('.')) != std::string::npos) {
-                    currentParts.push_back(currentVerCopy.substr(0, pos));
-                    currentVerCopy.erase(0, pos + 1);
-                }
-                if (!currentVerCopy.empty()) {
-                    currentParts.push_back(currentVerCopy);
-                }
-
-                std::string latestVerCopy = latestVer;
-                pos = 0;
-                while ((pos = latestVerCopy.find('.')) != std::string::npos) {
-                    latestParts.push_back(latestVerCopy.substr(0, pos));
-                    latestVerCopy.erase(0, pos + 1);
-                }
-                if (!latestVerCopy.empty()) {
-                    latestParts.push_back(latestVerCopy);
-                }
-
-                size_t minSize = std::min(currentParts.size(), latestParts.size());
-                for (size_t i = 0; i < minSize; i++) {
-                    try {
-                        int currentNum = std::stoi(currentParts[i]);
-                        int latestNum = std::stoi(latestParts[i]);
-
-                        if (latestNum > currentNum) {
-                            isNewer = true;
-                            break;
-                        }
-                        else if (latestNum < currentNum) {
-                            isNewer = false;
-                            break;
-                        }
-                    }
-                    catch (const std::exception& e) {
-                        if (latestParts[i] > currentParts[i]) {
-                            isNewer = true;
-                            break;
-                        }
-                        else if (latestParts[i] < currentParts[i]) {
-                            isNewer = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (!isNewer && currentParts.size() < latestParts.size()) {
-                    isNewer = true;
-                }
-            }
-
-            return isNewer;
+            const std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            doc.Parse(content.c_str());
+            return !doc.HasParseError() && doc.IsObject();
         }
 
-        logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_INITIALIZER, "Failed to parse GitHub API response");
-        return false;
+        void write_state(rapidjson::Document& doc) {
+            rapidjson::StringBuffer buffer;
+            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+            doc.Accept(writer);
+
+            std::ofstream file(state_path(), std::ios::binary | std::ios::trunc);
+            file.write(buffer.GetString(), static_cast<std::streamsize>(buffer.GetSize()));
+        }
+
+        std::string state_string(const char* key) {
+            rapidjson::Document doc;
+            if (!read_state(doc) || !doc.HasMember(key) || !doc[key].IsString())
+                return {};
+            return doc[key].GetString();
+        }
+
+        void set_state(const char* key, const std::string& value) {
+            rapidjson::Document doc;
+            if (!read_state(doc))
+                doc.SetObject();
+
+            auto& allocator = doc.GetAllocator();
+            rapidjson::Value text(value.c_str(), allocator);
+
+            if (doc.HasMember(key))
+                doc[key] = text;
+            else
+                doc.AddMember(rapidjson::Value(key, allocator), text, allocator);
+
+            write_state(doc);
+        }
+
+        // 1.2.0 is newer than 1.1.2, and a fork suffix never counts on its own
+        bool is_newer(const std::string& latest, const std::string& current) {
+            auto numbers = [](const std::string& version) {
+                std::vector<int> parts;
+                std::string text = version;
+                if (!text.empty() && (text[0] == 'v' || text[0] == 'V'))
+                    text = text.substr(1);
+
+                std::stringstream stream(text);
+                for (std::string part; std::getline(stream, part, '.');) {
+                    try {
+                        parts.push_back(std::stoi(part));
+                    }
+                    catch (const std::exception&) {
+                        break;
+                    }
+                }
+                return parts;
+            };
+
+            const std::vector<int> left = numbers(latest);
+            const std::vector<int> right = numbers(current);
+            if (left.empty() || right.empty())
+                return false;
+
+            for (size_t i = 0; i < std::min(left.size(), right.size()); ++i) {
+                if (left[i] != right[i])
+                    return left[i] > right[i];
+            }
+
+            return false;
+        }
+
+        std::string shell_quote(const std::string& text) {
+            std::string out = "'";
+            for (char c : text) {
+                if (c == '\'')
+                    out += "'\\''";
+                else
+                    out += c;
+            }
+            out += "'";
+            return out;
+        }
     }
 
     std::string get_server_version() {
         return SERVER_VERSION;
     }
 
-    void mark_prompted() {
-        utils::configuration::WriteString("UpdateInfo", "LastPromptedVersion", utils::configuration::ReadString("UpdateInfo", "AssetName", ""));
+    std::string get_latest_version() {
+        const std::string latest = state_string("latest");
+        return latest.empty() ? "release" : latest;
     }
 
-    std::string get_latest_version() {
-        return utils::configuration::ReadString("UpdateInfo", "LatestVersion", "release");
+    void mark_prompted() {
+        set_state("prompted", state_string("latest"));
+    }
+
+    bool check_for_updates() {
+        std::string error;
+        const std::string response = webdl::fetch(GITHUB_API_URL, error);
+        if (response.empty()) {
+            std::cout << "Update check failed: " << error << std::endl;
+            return false;
+        }
+
+        rapidjson::Document release;
+        release.Parse(response.c_str());
+        if (release.HasParseError() || !release.IsObject() || !release.HasMember("tag_name") || !release["tag_name"].IsString()) {
+            std::cout << "Update check: could not read the GitHub answer" << std::endl;
+            return false;
+        }
+
+        const std::string latest = release["tag_name"].GetString();
+
+        // only the archive of this platform is an update, installing the other one would
+        // leave a launcher that cannot start
+        std::string asset_name;
+        std::string asset_url;
+        if (release.HasMember("assets") && release["assets"].IsArray()) {
+            for (const auto& asset : release["assets"].GetArray()) {
+                if (!asset.IsObject() || !asset.HasMember("name") || !asset["name"].IsString())
+                    continue;
+
+                const std::string name = asset["name"].GetString();
+                if (!ends_with(name, asset_extension()))
+                    continue;
+
+                asset_name = name;
+                if (asset.HasMember("browser_download_url") && asset["browser_download_url"].IsString())
+                    asset_url = asset["browser_download_url"].GetString();
+                break;
+            }
+        }
+
+        std::cout << "Version " << SERVER_VERSION << ", latest " << latest;
+        if (asset_name.empty())
+            std::cout << " (no " << asset_extension() << " asset, this platform is not built there)";
+        std::cout << std::endl;
+
+        set_state("latest", latest);
+        set_state("asset", asset_name);
+        set_state("url", asset_url.empty() ? DOWNLOAD_URL_BASE + latest + "/" + asset_name : asset_url);
+
+        if (asset_name.empty() || asset_url.empty())
+            return false;
+
+        if (state_string("prompted") == latest)
+            return false;
+
+        return is_newer(latest, SERVER_VERSION);
     }
 
     bool download_and_update() {
-        std::string latestVersion = utils::configuration::ReadString("UpdateInfo", "LatestVersion", "release");
-        std::string assetName = utils::configuration::ReadString("UpdateInfo", "AssetName", "Project_BO4_Launcher_Update_1.0.18.1.zip");
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_INITIALIZER, "Starting update process to version %s", latestVersion.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Asset name: %s", assetName.c_str());
+        const std::string latest = state_string("latest");
+        const std::string asset = state_string("asset");
+        const std::string url = state_string("url");
+        if (latest.empty() || url.empty())
+            return false;
 
-        char tempPath[MAX_PATH];
-        GetTempPathA(MAX_PATH, tempPath);
-        std::string updateDir = std::string(tempPath) + "\\bo4_update";
-        CreateDirectoryA(updateDir.c_str(), NULL);
+        std::cout << "[update] state " << state_path().string() << " latest=" << state_string("latest")
+                  << " asset=" << state_string("asset") << " url=" << state_string("url") << std::endl;
 
-        std::string downloadUrl = DOWNLOAD_URL_BASE + latestVersion + "/" + assetName;
-        std::string zipPath = updateDir + "\\update.zip";
+        const fs::path exe = launcher::executable_path();
+        const fs::path exe_dir = exe.parent_path();
+        const fs::path temp = fs::temp_directory_path() / "shield-launcher-update";
+        std::error_code ec;
+        fs::remove_all(temp, ec);
+        fs::create_directories(temp, ec);
 
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Download URL: %s", downloadUrl.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Update directory: %s", updateDir.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Zip path: %s", zipPath.c_str());
-
-        char exePath[MAX_PATH];
-        GetModuleFileNameA(NULL, exePath, MAX_PATH);
-        std::string currentExe = std::string(exePath);
-        std::string exeDir = currentExe.substr(0, currentExe.find_last_of("\\"));
-        std::string exeName = currentExe.substr(currentExe.find_last_of("\\") + 1);
-        std::string projectDir = exeDir.substr(0, exeDir.find_last_of("\\"));  // Get parent directory (project-bo4)
-        std::string updateBatchPath = updateDir + "\\update.bat";
-
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Current exe: %s", currentExe.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Exe directory: %s", exeDir.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Project directory: %s", projectDir.c_str());
-        logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Exe name: %s", exeName.c_str());
-
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Downloading update file...");
-
-        HINTERNET hInternet = InternetOpenA("BO4-Launcher-Updater", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-        if (!hInternet) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to initialize WinINet for download");
+        const fs::path archive = temp / asset;
+        const std::string error = webdl::download(url, archive.string());
+        if (!error.empty()) {
+            std::cout << error << std::endl;
             return false;
         }
 
-        HINTERNET hConnect = InternetOpenUrlA(hInternet, downloadUrl.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
-        if (!hConnect) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to connect to download URL");
-            InternetCloseHandle(hInternet);
+#ifdef _WIN32
+        // a batch that waits for us to close, unpacks, copies over the launcher folder
+        // and starts it again
+        const fs::path script = temp / "update.bat";
+        std::ofstream batch(script);
+        batch << "@echo off\r\n";
+        batch << "echo Waiting for the launcher to close...\r\n";
+        batch << "timeout /t 3 > nul\r\n";
+        batch << "powershell -Command \"Expand-Archive -Path '" << archive.string() << "' -DestinationPath '"
+              << temp.string() << "' -Force\"\r\n";
+        batch << "set src=\"" << temp.string() << "\"\r\n";
+        batch << "for /d %%i in (\"" << temp.string() << "\\*\") do set src=\"%%i\"\r\n";
+        batch << "xcopy /s /y \"%src%\\*\" \"" << exe_dir.string() << "\\\" > nul\r\n";
+        batch << "rmdir /s /q \"" << temp.string() << "\" > nul\r\n";
+        batch << "start \"\" \"" << exe.string() << "\"\r\n";
+        batch << "del \"%~f0\"\r\n";
+        batch.close();
+
+        const std::string command = "start \"\" \"" + script.string() + "\"";
+        return std::system(command.c_str()) == 0;
+#else
+        // the archive holds Project_BO4_Launcher_Linux/, copy its content over the launcher folder
+        const fs::path script = temp / "update.sh";
+        std::ofstream shell(script);
+        shell << "#!/bin/sh\n";
+        shell << "while kill -0 " << getpid() << " 2>/dev/null; do sleep 1; done\n";
+        shell << "tmp=$(mktemp -d)\n";
+        shell << "tar -xzf " << shell_quote(archive.string()) << " -C \"$tmp\" || exit 1\n";
+        shell << "cp -rf \"$tmp\"/*/. " << shell_quote(exe_dir.string()) << "/ || exit 1\n";
+        shell << "chmod +x " << shell_quote(exe.string()) << "\n";
+        shell << "rm -rf \"$tmp\" " << shell_quote(archive.string()) << "\n";
+        shell << "cd " << shell_quote(exe_dir.string()) << " && " << shell_quote(exe.string()) << " >/dev/null 2>&1 &\n";
+        shell.close();
+
+        fs::permissions(script, fs::perms::owner_exec | fs::perms::owner_read, fs::perm_options::add, ec);
+
+        // a detached child, so it survives the launcher closing and the shell never gets in the way
+        std::string spawn_error;
+        if (!launcher::spawn_detached("/bin/sh", { script.string() }, {}, exe_dir.string(), &spawn_error)) {
+            std::cout << "[update] " << spawn_error << std::endl;
             return false;
         }
 
-        HANDLE hFile = CreateFileA(zipPath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == INVALID_HANDLE_VALUE) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Failed to create update zip file");
-            InternetCloseHandle(hConnect);
-            InternetCloseHandle(hInternet);
-            return false;
-        }
-
-        char buffer[8192];
-        DWORD bytesRead = 0;
-        DWORD bytesWritten = 0;
-        BOOL readResult = FALSE;
-
-        do {
-            readResult = InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead);
-            if (readResult && bytesRead > 0) {
-                WriteFile(hFile, buffer, bytesRead, &bytesWritten, NULL);
-            }
-        } while (readResult && bytesRead > 0);
-
-        CloseHandle(hFile);
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-
-        if (!std::filesystem::exists(zipPath)) {
-            logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE, "[ERROR] Download failed - zip file not found");
-            return false;
-        }
-
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Download complete. Extracting files...");
-
-
-        std::string batchContent = "@echo off\r\n";
-        batchContent += "echo Waiting for launcher to close...\r\n";
-        batchContent += "ping -n 5 127.0.0.1 > nul\r\n"; 
-
-        batchContent += "echo Extracting update files...\r\n";
-        batchContent += "powershell -Command \"Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + updateDir + "' -Force\"\r\n";
-        batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
-        batchContent += "  echo Failed to extract update files!\r\n";
-        batchContent += "  pause\r\n";
-        batchContent += "  exit /b 1\r\n";
-        batchContent += ")\r\n";
-
-        batchContent += "echo Updating files...\r\n";
-        batchContent += "taskkill /f /im \"" + exeName + "\" > nul 2>&1\r\n";
-        batchContent += "ping -n 2 127.0.0.1 > nul\r\n";
-        
-        batchContent += "echo Checking for update files...\r\n";
-        batchContent += "if exist \"" + updateDir + "\\Project_BO4\\*\" (\r\n";
-        batchContent += "  echo Found nested Project_BO4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\Project_BO4\\*\" \"" + projectDir + "\\\" > nul\r\n";
-        batchContent += ") else if exist \"" + updateDir + "\\project-bo4\\*\" (\r\n";
-        batchContent += "  echo Found nested project-bo4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\project-bo4\\*\" \"" + projectDir + "\\\" > nul\r\n";
-        batchContent += ") else if exist \"" + updateDir + "\\launcher\\*\" (\r\n";
-        batchContent += "  echo Found launcher folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\launcher\\*\" \"" + exeDir + "\\\" > nul\r\n";
-        batchContent += "  for /d %%i in (\"" + updateDir + "\\*\") do (\r\n";
-        batchContent += "    if not \"%%~nxi\"==\"launcher\" xcopy /s /y \"%%i\\*\" \"" + projectDir + "\\%%~nxi\\\" > nul\r\n";
-        batchContent += "  )\r\n";
-        batchContent += ") else (\r\n";
-        batchContent += "  echo Using root folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\*\" \"" + projectDir + "\\\" > nul\r\n";
-        batchContent += ")\r\n";
-        
-        batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
-        batchContent += "  echo Failed to copy update files!\r\n";
-        batchContent += "  pause\r\n";
-        batchContent += "  exit /b 1\r\n";
-        batchContent += ")\r\n";
-
-        batchContent += "echo Cleaning up...\r\n";
-        batchContent += "del \"" + zipPath + "\" > nul\r\n";
-        batchContent += "rmdir /s /q \"" + updateDir + "\" > nul\r\n";
-
-        batchContent += "echo Starting launcher...\r\n";
-        batchContent += "start \"\" \"" + exeDir + "\\" + exeName + "\"\r\n";
-        batchContent += "echo Update complete!\r\n";
-        batchContent += "timeout /t 3\r\n";
-        batchContent += "del \"%~f0\"\r\n";
-        batchContent += "exit\r\n";
-
-        std::ofstream batchFile(updateBatchPath);
-        batchFile << batchContent;
-        batchFile.close();
-
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Created update script at %s", updateBatchPath.c_str());
-        logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Launching update process and closing launcher...");
-
-        SHELLEXECUTEINFOA sei = { 0 };
-        sei.cbSize = sizeof(SHELLEXECUTEINFOA);
-        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-        sei.hwnd = NULL;
-        sei.lpVerb = "open";
-        sei.lpFile = updateBatchPath.c_str();
-        sei.lpParameters = "";
-        sei.lpDirectory = NULL;
-        sei.nShow = SW_SHOW;  
-
-        if (ShellExecuteExA(&sei)) {
-            logger::write(logger::LOG_LEVEL_INFO, logger::LOG_LABEL_UPDATE, "[UPDATE] Update script started successfully");
-            return true;
-        }
-
-        logger::write(logger::LOG_LEVEL_ERROR, logger::LOG_LABEL_UPDATE,
-            "[ERROR] Failed to start update script. Error code: %d", GetLastError());
-        return false;
+        return true;
+#endif
     }
 }

@@ -263,8 +263,8 @@ function onHostMessage(message) {
       volume.value = message.volume;
       paintVolume();
       closeOnPlay.checked = message.closeOnPlay;
-      language.value = message.language;
       markLanguages(message.installedLanguages);
+      applyPlatform(message);
       if (!message.gameFound) toast("BlackOps4.exe not found! Make sure the launcher is in the game folder.", true);
       requestAnimationFrame(playIntro);
       break;
@@ -286,6 +286,21 @@ function onHostMessage(message) {
     case "dedicated":
       fillDedicated(message.values);
       openDialog("dedicated-dialog");
+      break;
+    case "mods":
+      renderMods(message);
+      openDialog("mods-dialog");
+      break;
+    case "linux":
+      fillLinux(message);
+      openDialog("linux-dialog");
+      break;
+    case "linuxSaved":
+      $("linux-dialog").close();
+      toast("Linux settings saved.");
+      break;
+    case "pickedFolder":
+      $("linux-prefix").value = message.value;
       break;
     case "settings":
       renderSettings(message.entries);
@@ -351,6 +366,39 @@ function previewHost(message) {
       break;
     case "openSettings":
       reply({ type: "settings", entries: previewEntries(preview.config) });
+      break;
+    case "openMods":
+      reply({
+        type: "mods",
+        modsDir: "project-bo4/mods",
+        installed: [{ name: "Enhancement Mod", folder: "EnhancementModT8", enabled: true, files: 214 }],
+        catalog: [
+          { title: "[ZM] - Enhancement Mod", modes: "[ZM]", description: "Improves the zombies experience with a lot of mods and a config in a menu.", url: "about:blank" },
+          { title: "[ALL] - Atian Mod Menu", modes: "[ALL]", description: "A really cool looking mod menu.", url: "about:blank" },
+        ],
+        unmanaged: ["loose.gscc"],
+      });
+      break;
+    case "openLinux":
+      reply({
+        type: "linux",
+        runtimePath: "/home/elo/.local/share/Steam/compatibilitytools.d/GE-Proton11-9",
+        prefixPath: "/home/elo/Games/Heroic/Prefixes/default",
+        backend: "umu",
+        prefixReady: true,
+        runtimes: [
+          { name: "GE-Proton11-9", path: "/home/elo/.local/share/Steam/compatibilitytools.d/GE-Proton11-9", kind: "proton" },
+          { name: "wine-tkg", path: "/home/elo/.config/heroic/tools/wine/wine-tkg", kind: "wine" },
+        ],
+      });
+      break;
+    case "saveLinux":
+      $("linux-dialog").close();
+      toast("Linux settings saved.");
+      break;
+    case "toggleMod":
+    case "removeMod":
+    case "installMod":
       break;
     case "saveSettings":
       reply({ type: "settingsSaved" });
@@ -454,6 +502,173 @@ window.addEventListener("load", () => {
 
   // never stay hidden if the launcher doesn't answer
   setTimeout(playIntro, 4000);
+});
+
+/* platform: the Linux build has its own launch backend and its own settings */
+
+function applyPlatform(message) {
+  $("open-linux").hidden = message.platform !== "linux";
+
+  // the game language comes from Battle.net's registry entry, there is none under Linux:
+  // the picker goes away instead of sitting there showing a language it cannot set
+  const picker = document.querySelector(".language");
+  if (message.language) picker.querySelector("select").value = message.language;
+  else picker.remove();
+}
+
+/* mods: project-bo4/mods, one folder per mod with a metadata.json */
+
+function modRow(title, subtitle) {
+  const row = document.createElement("div");
+  row.className = "mod-item";
+
+  const text = document.createElement("div");
+  text.className = "mod-text";
+
+  const name = document.createElement("span");
+  name.className = "mod-name";
+  name.textContent = title;
+  text.append(name);
+
+  if (subtitle) {
+    const small = document.createElement("small");
+    small.textContent = subtitle;
+    text.append(small);
+  }
+
+  row.append(text);
+  return row;
+}
+
+function modButton(text, className, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = text;
+  button.addEventListener("click", () => onClick(button));
+  return button;
+}
+
+function renderMods(message) {
+  $("mods-dir").textContent = message.modsDir || "";
+
+  const installed = $("mods-installed");
+  installed.textContent = "";
+
+  if (!message.installed.length) {
+    installed.append(modRow("Nothing installed yet.", "One folder per mod inside project-bo4/mods."));
+  }
+
+  for (const mod of message.installed) {
+    const row = modRow(mod.name, (mod.enabled ? "enabled" : "disabled") + " - " + mod.files + " files - " + mod.folder);
+    row.classList.toggle("disabled", !mod.enabled);
+
+    const toggle = document.createElement("label");
+    toggle.className = "toggle";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = mod.enabled;
+    box.addEventListener("change", () => send({ action: "toggleMod", folder: mod.folder, enabled: box.checked }));
+    const sw = document.createElement("span");
+    sw.className = "switch";
+    toggle.append(box, sw);
+
+    // a second click confirms: deleting a mod folder is not undoable
+    const remove = modButton("Delete", "btn-ghost danger", (button) => {
+      if (button.dataset.armed) {
+        send({ action: "removeMod", folder: mod.folder });
+        return;
+      }
+
+      button.dataset.armed = "1";
+      button.textContent = "Confirm";
+      setTimeout(() => {
+        delete button.dataset.armed;
+        button.textContent = "Delete";
+      }, 3000);
+    });
+
+    row.append(toggle, remove);
+    installed.append(row);
+  }
+
+  const catalog = $("mods-catalog");
+  catalog.textContent = "";
+
+  for (const entry of message.catalog) {
+    const row = modRow(entry.title, entry.description);
+
+    const mode = document.createElement("span");
+    mode.className = "chip";
+    mode.textContent = entry.modes;
+
+    const install = modButton("Install", "btn-ghost", (button) => {
+      button.disabled = true;
+      button.textContent = "Installing";
+      send({ action: "installMod", url: entry.url, title: entry.title });
+    });
+
+    row.append(mode, install);
+    catalog.append(row);
+  }
+
+  const unmanaged = $("mods-unmanaged");
+  unmanaged.hidden = !message.unmanaged.length;
+  unmanaged.textContent = message.unmanaged.length
+    ? "The game ignores loose files, only folders with a metadata.json load: " + message.unmanaged.join(", ")
+    : "";
+}
+
+/* Linux: the Wine prefix and the Proton build the game runs in */
+
+function fillLinux(message) {
+  const form = $("linux-form");
+  form.elements.namedItem("backend").value = message.backend || "umu";
+
+  const runtime = form.elements.namedItem("runtime");
+  runtime.textContent = "";
+
+  if (!message.runtimes.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No Proton or Wine build found";
+    runtime.append(option);
+  }
+
+  for (const item of message.runtimes) {
+    const option = document.createElement("option");
+    option.value = item.path;
+    option.textContent = item.name + " (" + item.kind + ")";
+    runtime.append(option);
+  }
+
+  runtime.value = message.runtimePath;
+  $("linux-prefix").value = message.prefixPath || "";
+  $("linux-state").textContent = message.prefixReady
+    ? "Prefix ready, the game runs in it."
+    : "No Wine prefix there yet, Create prefix builds one.";
+}
+
+function linuxValues() {
+  const form = $("linux-form");
+  return {
+    runtimePath: form.elements.namedItem("runtime").value,
+    backend: form.elements.namedItem("backend").value,
+    prefixPath: $("linux-prefix").value.trim(),
+  };
+}
+
+$("open-mods").addEventListener("click", () => send({ action: "openMods" }));
+$("mods-refresh").addEventListener("click", () => send({ action: "refreshMods" }));
+$("mods-install-file").addEventListener("click", () => send({ action: "installModArchive" }));
+
+$("open-linux").addEventListener("click", () => send({ action: "openLinux" }));
+$("linux-browse").addEventListener("click", () => send({ action: "pickPrefix" }));
+$("linux-create").addEventListener("click", () => send({ action: "createPrefix", ...linuxValues() }));
+
+$("linux-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  send({ action: "saveLinux", ...linuxValues() });
 });
 
 paintVolume();

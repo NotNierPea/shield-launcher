@@ -1,7 +1,13 @@
 #include "std_include.hpp"
 #include "dll_loading.hpp"
-#include <Windows.h>
+#include "zip_archive.hpp"
+#include "linux_run.hpp"
+#include "../launcher_main/launcher_actions.hpp"
+
+#ifdef _WIN32
 #include <TlHelp32.h>
+#endif
+
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -30,124 +36,50 @@ namespace {
         return true;
     }
 
-    // read
-    bool getZipEntryCrc32(const fs::path& zipPath, const std::string& entryName, uint32_t& outCrc) {
-        std::ifstream file(zipPath, std::ios::binary);
-        if (!file) {
-            return false;
+    // the game folder, whether the launcher sits at its root or in project-bo4/launcher
+    fs::path resolveGameDir(const fs::path& start) {
+        if (start.empty()) {
+            return {};
         }
 
-        file.seekg(0, std::ios::end);
-        const auto fileSize = static_cast<std::streamoff>(file.tellg());
-        if (fileSize < 22) {
-            return false;
+        if (fs::exists(start / "BlackOps4.exe")) {
+            return start;
         }
 
-        const std::streamoff searchWindow = std::min<std::streamoff>(fileSize, 22 + 65536);
-        std::vector<unsigned char> tail(static_cast<size_t>(searchWindow));
-        file.seekg(fileSize - searchWindow);
-        file.read(reinterpret_cast<char*>(tail.data()), tail.size());
-
-        std::streamoff eocdOffset = -1;
-        for (std::streamoff i = static_cast<std::streamoff>(tail.size()) - 22; i >= 0; --i) {
-            if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
-                eocdOffset = i;
-                break;
-            }
-        }
-        if (eocdOffset < 0) {
-            return false;
+        const fs::path parent = start.parent_path().parent_path();
+        if (fs::exists(parent / "BlackOps4.exe")) {
+            return parent;
         }
 
-        const uint32_t centralDirOffset =
-            static_cast<uint32_t>(tail[eocdOffset + 16]) |
-            (static_cast<uint32_t>(tail[eocdOffset + 17]) << 8) |
-            (static_cast<uint32_t>(tail[eocdOffset + 18]) << 16) |
-            (static_cast<uint32_t>(tail[eocdOffset + 19]) << 24);
+        return {};
+    }
 
-        file.seekg(centralDirOffset);
-
-        while (file) {
-            unsigned char header[46];
-            file.read(reinterpret_cast<char*>(header), sizeof(header));
-            if (file.gcount() != static_cast<std::streamsize>(sizeof(header))) {
-                break;
-            }
-            if (!(header[0] == 0x50 && header[1] == 0x4b && header[2] == 0x01 && header[3] == 0x02)) {
-                break;
-            }
-
-            const uint32_t crc =
-                static_cast<uint32_t>(header[16]) |
-                (static_cast<uint32_t>(header[17]) << 8) |
-                (static_cast<uint32_t>(header[18]) << 16) |
-                (static_cast<uint32_t>(header[19]) << 24);
-
-            const uint16_t nameLen = static_cast<uint16_t>(header[28]) | (static_cast<uint16_t>(header[29]) << 8);
-            const uint16_t extraLen = static_cast<uint16_t>(header[30]) | (static_cast<uint16_t>(header[31]) << 8);
-            const uint16_t commentLen = static_cast<uint16_t>(header[32]) | (static_cast<uint16_t>(header[33]) << 8);
-
-            std::string name(nameLen, '\0');
-            file.read(name.data(), nameLen);
-
-            if (name == entryName) {
-                outCrc = crc;
-                return true;
-            }
-
-            file.seekg(extraLen + commentLen, std::ios::cur);
+    // the released launcher folder, wherever the launcher itself lives
+    fs::path launcherResourcesDir(const fs::path& gamePath, const fs::path& launcherPath) {
+        std::error_code ec;
+        if (fs::exists(launcherPath / "exe.zip", ec)) {
+            return launcherPath;
         }
 
-        return false;
+        const fs::path nested = gamePath / "project-bo4" / "launcher";
+        if (fs::exists(nested / "exe.zip", ec)) {
+            return nested;
+        }
+
+        return launcherPath;
     }
 }
 
 namespace DllLoading {
     std::thread cleanupThread;
     std::atomic<bool> cleanupThreadRunning(false);
-    std::string gameDirectoryForCleanup;  
-    DWORD gameProcessId = 0;  
-
-    void monitorGameAndCleanup(const std::string& gamePath, DWORD processId) {
-        cleanupThreadRunning = true;
-        std::cout << "Starting cleanup monitor thread for process ID: " << processId << std::endl;
-        
-        gameProcessId = processId;
-        
-        HANDLE hProcess = OpenProcess(SYNCHRONIZE, FALSE, processId);
-        if (hProcess == NULL) {
-            std::cout << "Failed to open process handle: " << GetLastError() << std::endl;
-            while (isGameRunning()) {
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-            }
-        } else {
-
-            std::cout << "Waiting for game process to exit..." << std::endl;
-            WaitForSingleObject(hProcess, INFINITE);
-            CloseHandle(hProcess);
-        }
-        
-        gameProcessId = 0;  
-        std::cout << "Game has terminated. Cleaning up DLLs..." << std::endl;
-        
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        
-        fs::path gameDir = fs::path(gamePath);
-        fs::path dllPath = gameDir / "XInput9_1_0.dll";
-        
-        try {
-            if (fs::exists(dllPath)) {
-                fs::remove(dllPath);
-                std::cout << "Successfully deleted: " << dllPath.string() << std::endl;
-            }
-        } catch (const std::exception& e) {
-            std::cout << "Error deleting DLLs: " << e.what() << std::endl;
-        }
-        
-        cleanupThreadRunning = false;
-    }
+    std::string gameDirectoryForCleanup;
+#ifdef _WIN32
+    DWORD gameProcessId = 0;
+#endif
 
     bool isGameRunning() {
+#ifdef _WIN32
         if (gameProcessId != 0) {
             HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, gameProcessId);
             if (hProcess != NULL) {
@@ -160,9 +92,10 @@ namespace DllLoading {
                 return false;
             }
         }
-        
+
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (snapshot == INVALID_HANDLE_VALUE) return false;
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return false;
 
         PROCESSENTRY32W processEntry;
         processEntry.dwSize = sizeof(processEntry);
@@ -182,6 +115,9 @@ namespace DllLoading {
 
         CloseHandle(snapshot);
         return found;
+#else
+        return launcher::linux_game_running();
+#endif
     }
 
     Result copyClientDll(const std::string& launcherDir) {
@@ -189,80 +125,50 @@ namespace DllLoading {
             return Result::InvalidGamePath;
         }
 
-        fs::path gamePath = fs::path(launcherDir);
-        fs::path gameExePath = gamePath / "BlackOps4.exe";
-        
-        std::cout << "Initial game path: " << gamePath.string() << std::endl;
-        std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
-        
-        if (!fs::exists(gameExePath)) {
-            fs::path parentPath = gamePath.parent_path().parent_path();
-            gameExePath = parentPath / "BlackOps4.exe";
-            
-            std::cout << "Trying parent path: " << parentPath.string() << std::endl;
-            std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
-            
-            if (!fs::exists(gameExePath)) {
-                std::cout << "Game exe not found at parent path either" << std::endl;
-                return Result::InvalidGamePath;
-            }
-            
-            gamePath = parentPath;
-            std::cout << "Updated game path to: " << gamePath.string() << std::endl;
+        const fs::path launcherPath = fs::path(launcherDir);
+        const fs::path gamePath = resolveGameDir(launcherPath);
+        if (gamePath.empty()) {
+            std::cout << "Game exe not found next to the launcher nor two folders up" << std::endl;
+            return Result::InvalidGamePath;
         }
 
-        fs::path sourceDll = fs::path(launcherDir) / "XInput9_1_0.dll";
-        std::cout << "Looking for client dll at: " << sourceDll.string() << std::endl;
+        const fs::path dllPath = gamePath / "XInput9_1_0.dll";
+        const fs::path sourceDll = launcherPath / "XInput9_1_0.dll";
 
+        // the released zips carry the online dll, so a launcher folder without the
+        // plain file still has one
+        fs::path zipDll;
         if (!fs::exists(sourceDll)) {
-            return Result::FileNotFound;
-        }
-
-        // Note: not needed anymore cause of ATE47's plugin now loading zone from project-bo4/zone
-
-        /*
-        // zone shit
-        std::cout << "Copying zone folders..." << std::endl;
-
-        // --- Copy project-bo4/zone to <gameDir>/zone ---
-        try {
-            fs::path sourceZone = gamePath / "project-bo4" / "zone";
-            fs::path targetZone = gamePath / "zone";
-
-            if(fs::exists(sourceZone)) {
-                std::cout << "Copying zone files from: " << sourceZone.string() << " to: " << targetZone.string() << std::endl;
-                fs::create_directories(targetZone); // target exists?
-
-                for(const auto& entry : fs::directory_iterator(sourceZone)) {
-                    fs::path dest = targetZone / entry.path().filename();
-                    std::cout << "Copying: " << entry.path().string() << " -> " << dest.string() << std::endl;
-                    fs::copy(entry.path(), dest, fs::copy_options::overwrite_existing);
+            for (const char* zipName : { "mp.zip", "solo.zip" }) {
+                const fs::path candidate = launcherResourcesDir(gamePath, launcherPath) / zipName;
+                if (fs::exists(candidate)) {
+                    zipDll = candidate;
+                    break;
                 }
             }
-            else {
-                std::cout << "Source zone directory does not exist: " << sourceZone.string() << std::endl;
+
+            // an install that already has its dll (the client package dropped it there) needs nothing
+            if (zipDll.empty()) {
+                std::error_code exists_ec;
+                return fs::exists(dllPath, exists_ec) ? Result::Success : Result::FileNotFound;
             }
         }
-        catch(const std::exception& e) {
-            std::cout << "Failed to copy zone files: " << e.what() << std::endl;
-        }
-        */
 
-        // delete the old support file, to avoid some getting ui errors cause of two zone files
-        fs::path supportFF = gamePath / "zone" / "support.ff";
-        try {
-            if(fs::exists(supportFF)) {
-                std::cout << "Deleting: " << supportFF.string() << std::endl;
-                fs::remove(supportFF);
+        // delete the old support file, two zone files give ui errors
+        std::error_code ec;
+        const fs::path supportFF = gamePath / "zone" / "support.ff";
+        if (fs::exists(supportFF, ec)) {
+            fs::remove(supportFF, ec);
+        }
+
+        if (!zipDll.empty()) {
+            if (!zip::extractEntry(zipDll.string(), "XInput9_1_0.dll", dllPath.string())) {
+                return Result::ZipError;
             }
-            else
-                std::cout << "Failed to delete support.ff, it does not exists.." << std::endl;
-        }
-        catch(const std::exception& e) {
-            std::cout << "Failed to delete support.ff: " << e.what() << std::endl;
-        }
 
-        fs::path dllPath = gamePath / "XInput9_1_0.dll";
+            std::cout << "Extracted XInput9_1_0.dll from " << zipDll.filename().string() << std::endl;
+            return Result::Success;
+        }
 
         // same file skips the copy, a running game keeps the dll locked
         uint32_t sourceDllCrc = 0;
@@ -275,7 +181,6 @@ namespace DllLoading {
             return Result::Success;
         }
 
-        std::error_code ec;
         fs::copy_file(sourceDll, dllPath, fs::copy_options::overwrite_existing, ec);
         if (ec) {
             std::cout << "Failed to copy XInput9_1_0.dll: " << ec.message() << std::endl;
@@ -291,165 +196,129 @@ namespace DllLoading {
             return Result::InvalidGamePath;
         }
 
-        fs::path gamePath = fs::path(gameDir);
-        fs::path gameExePath = gamePath / "BlackOps4.exe";
-
-        std::cout << "Initial game path: " << gamePath.string() << std::endl;
-        std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
-
-        if (!fs::exists(gameExePath)) {
-            fs::path parentPath = gamePath.parent_path().parent_path();
-            gameExePath = parentPath / "BlackOps4.exe";
-
-            std::cout << "Trying parent path: " << parentPath.string() << std::endl;
-            std::cout << "Looking for game exe at: " << gameExePath.string() << std::endl;
-
-            if (!fs::exists(gameExePath)) {
-                std::cout << "Game exe not found at parent path either" << std::endl;
-                return Result::InvalidGamePath;
-            }
-
-            gamePath = parentPath;
-            std::cout << "Updated game path to: " << gamePath.string() << std::endl;
+        const fs::path gamePath = resolveGameDir(fs::path(gameDir));
+        if (gamePath.empty()) {
+            std::cout << "Game exe not found next to the launcher nor two folders up" << std::endl;
+            return Result::InvalidGamePath;
         }
 
-        fs::path launcherDir = gamePath / "project-bo4" / "launcher";
-        fs::path zipPath = launcherDir / "exe.zip";
-        std::cout << "Looking for zip at: " << zipPath.string() << std::endl;
-        std::cout << "File exists: " << (fs::exists(zipPath) ? "Yes" : "No") << std::endl;
+        const fs::path launcherPath = launcherResourcesDir(gamePath, fs::path(gameDir));
+        const fs::path zipPath = launcherPath / "exe.zip";
+        const fs::path gameExePath = gamePath / "BlackOps4.exe";
 
+        // exe.zip only refreshes the game exe: an install that has one already is playable
         if (!fs::exists(zipPath)) {
+            if (fs::exists(gameExePath)) {
+                std::cout << "No " << zipPath.string() << ", keeping the exe already in place" << std::endl;
+                return Result::Success;
+            }
+
+            std::cout << "Looking for zip at: " << zipPath.string() << " (missing)" << std::endl;
             return Result::FileNotFound;
         }
 
-        uint32_t zipExeCrc = 0;
+        // the zip's own crc tells whether the exe on disk is already that one
+        zip::Entry entry;
         uint32_t existingExeCrc = 0;
-        if (getZipEntryCrc32(zipPath, "BlackOps4.exe", zipExeCrc) &&
+        if (zip::findEntry(zipPath.string(), "BlackOps4.exe", entry) &&
             computeFileCrc32(gameExePath, existingExeCrc) &&
-            zipExeCrc == existingExeCrc) {
+            entry.crc32 == existingExeCrc) {
             std::cout << "BlackOps4.exe already up to date, skipping extraction" << std::endl;
             return Result::Success;
         }
 
-        try {
-            std::string extractCmd = "powershell -Command \"";
-            extractCmd += "Expand-Archive -Path '" + zipPath.string() + "' -DestinationPath '" + gamePath.string() + "' -Force";
-            extractCmd += "\"";
-
-            std::cout << "Executing extraction command: " << extractCmd << std::endl;
-
-            int result = system(extractCmd.c_str());
-            if (result != 0) {
-                std::cout << "Extraction failed with code: " << result << std::endl;
-                return Result::ZipError;
-            }
-
-            if (!fs::exists(gameExePath)) {
-                std::cout << "Exe was not extracted successfully" << std::endl;
-                return Result::FileNotFound;
-            }
-
-            std::cout << "Extraction successful" << std::endl;
-            return Result::Success;
-        }
-        catch (const std::exception& e) {
-            std::cout << "Exception: " << e.what() << std::endl;
+        // in-process inflate: the powershell Expand-Archive call is Windows-only, and silent when it is absent
+        if (!zip::extractEntry(zipPath.string(), "BlackOps4.exe", gameExePath.string())) {
+            std::cout << "Failed to extract BlackOps4.exe from " << zipPath.string() << std::endl;
             return Result::ZipError;
         }
-        catch (...) {
-            std::cout << "Unknown exception" << std::endl;
-            return Result::ZipError;
+
+        if (!fs::exists(gameExePath)) {
+            return Result::FileNotFound;
         }
+
+        std::cout << "Extracted BlackOps4.exe to " << gameExePath.string() << std::endl;
+        return Result::Success;
     }
 
     void cleanupDllsAfterGame() {
         cleanupThreadRunning = true;
         std::cout << "Starting DLL cleanup monitor thread..." << std::endl;
-        std::cout << "Will clean up DLLs in directory: " << gameDirectoryForCleanup << std::endl;
-        
+
         while (isGameRunning()) {
             std::this_thread::sleep_for(std::chrono::seconds(2));
         }
-        
-        std::cout << "Game has terminated. Cleaning up DLLs..." << std::endl;
-        
+
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        
+
         if (gameDirectoryForCleanup.empty()) {
-            std::cout << "Error: Game directory path is empty" << std::endl;
             cleanupThreadRunning = false;
             return;
         }
-        
-        fs::path dllPath = fs::path(gameDirectoryForCleanup) / "XInput9_1_0.dll";
-        
-        std::cout << "Attempting to delete DLL at: " << dllPath.string() << std::endl;
-        
-        try {
-            if (fs::exists(dllPath)) {
-                std::cout << "DLL found, deleting: " << dllPath.string() << std::endl;
-                
-                for (int i = 0; i < 5; i++) {
-                    try {
-                        if (fs::remove(dllPath)) {
-                            std::cout << "Successfully deleted DLL" << std::endl;
-                            break;
-                        } else {
-                            std::cout << "Failed to delete DLL, attempt " << (i+1) << std::endl;
-                            std::this_thread::sleep_for(std::chrono::seconds(1));
-                        }
-                    } catch (const std::exception& e) {
-                        std::cout << "Error deleting DLL (attempt " << (i+1) << "): " << e.what() << std::endl;
-                        std::this_thread::sleep_for(std::chrono::seconds(1));
-                    }
+
+        const fs::path dllPath = fs::path(gameDirectoryForCleanup) / "XInput9_1_0.dll";
+
+        std::error_code ec;
+        if (fs::exists(dllPath, ec)) {
+            for (int i = 0; i < 5; i++) {
+                if (fs::remove(dllPath, ec)) {
+                    std::cout << "Successfully deleted DLL" << std::endl;
+                    break;
                 }
-            } else {
-                std::cout << "DLL not found at: " << dllPath.string() << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
             }
-        } catch (const std::exception& e) {
-            std::cout << "Error accessing DLL path: " << e.what() << std::endl;
         }
-        
+
         cleanupThreadRunning = false;
     }
 
     bool launchGame(const std::string& gameExePath, const std::string& gameFlags) {
         std::cout << "Launching game: " << gameExePath << gameFlags << std::endl;
 
-        fs::path gameDir = fs::path(gameExePath).parent_path();
-        std::string gameDirStr = gameDir.string();
+        const fs::path gameDir = fs::path(gameExePath).parent_path();
+        gameDirectoryForCleanup = gameDir.string();
 
-        gameDirectoryForCleanup = gameDirStr;
-        
-        SHELLEXECUTEINFOA shExInfo = {0};
+        bool launched = false;
+#ifdef _WIN32
+        SHELLEXECUTEINFOA shExInfo = { 0 };
         shExInfo.cbSize = sizeof(SHELLEXECUTEINFOA);
         shExInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
         shExInfo.hwnd = NULL;
         shExInfo.lpVerb = "open";
         shExInfo.lpFile = gameExePath.c_str();
         shExInfo.lpParameters = gameFlags.c_str();
-        shExInfo.lpDirectory = gameDirStr.c_str();  
+        shExInfo.lpDirectory = gameDirectoryForCleanup.c_str();
         shExInfo.nShow = SW_SHOW;
-        
-        std::cout << "Launching from directory: " << gameDirStr << std::endl;
-        
+
         if (!ShellExecuteExA(&shExInfo)) {
-            DWORD error = GetLastError();
-            std::cout << "ShellExecuteEx failed with error: " << error << std::endl;
+            std::cout << "ShellExecuteEx failed with error: " << GetLastError() << std::endl;
             return false;
         }
-        
+
         if (shExInfo.hProcess) {
             CloseHandle(shExInfo.hProcess);
         }
-        
-        if (cleanupThreadRunning && cleanupThread.joinable()) {
-            cleanupThread.join(); 
+
+        launched = true;
+#else
+        std::string error;
+        launched = launcher::launch_linux_game(gameExePath, gameFlags, &error);
+        if (!launched) {
+            std::cout << "Launch failed: " << error << std::endl;
         }
-        
+#endif
+
+        if (!launched) {
+            return false;
+        }
+
+        if (cleanupThreadRunning && cleanupThread.joinable()) {
+            cleanupThread.join();
+        }
+
         cleanupThread = std::thread(cleanupDllsAfterGame);
-        cleanupThread.detach(); 
-        
+        cleanupThread.detach();
+
         std::cout << "Game launched successfully!" << std::endl;
         return true;
     }
