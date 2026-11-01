@@ -1,0 +1,73 @@
+name: release
+
+# a tag is what players update from: the launcher asks github for releases/latest,
+# keeps the archive built for its platform and replaces itself with it. Without a
+# release there is nothing to update to, and a release without both archives
+# leaves one platform stuck on an old build.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "tag to publish, for example v1.1.2"
+        required: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # gh release create
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the launcher version
+        id: version
+        run: |
+          version=$(grep -oP 'SERVER_VERSION = "\K[^"]+' source/launcher/launcher_funcs/auto_update.cpp)
+          if [ -z "$version" ]; then
+            echo "::error::SERVER_VERSION not found in auto_update.cpp"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "launcher version: $version"
+
+      # the launcher compares the release tag with its own SERVER_VERSION, a release
+      # tagged above or below it is either never offered or offered forever
+      - name: Check the tag matches the launcher version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${{ steps.version.outputs.version }}"
+          if [ "$tag" != "$version" ] && [ "$tag" != "v$version" ]; then
+            echo "::error::tag $tag does not match the launcher version $version, bump SERVER_VERSION first"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Name the archives after the version
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          mv dist/Project_BO4_Launcher_Windows.zip "dist/Project_BO4_Launcher_Windows_$version.zip"
+          mv dist/Project_BO4_Launcher_Linux.tar.gz "dist/Project_BO4_Launcher_Linux_$version.tar.gz"
+          ls -la dist
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          gh release create "$tag" \
+            dist/*.zip dist/*.tar.gz \
+            --title "$tag" \
+            --generate-notes \
+            --verify-tag

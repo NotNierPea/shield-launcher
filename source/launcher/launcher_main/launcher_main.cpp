@@ -1,16 +1,20 @@
 #include "std_include.hpp"
 #include "launcher_actions.hpp"
+#include "page_actions.hpp"
 #include "../launcher_funcs/auto_update.hpp"
 #include <algorithm>
 #include <dwmapi.h>
 #include <mmsystem.h>
 #include <shlwapi.h>
+#include <shlobj.h>
+#include <commdlg.h>
 #include <wrl.h>
 #include <WebView2.h>
 
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "comdlg32.lib")
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
@@ -34,8 +38,7 @@ namespace {
     ComPtr<ICoreWebView2> webview;
 
     launcher::settings settings;
-    bool playing = false;
-    bool updating = false;
+    std::unique_ptr<page::controller> page_controller;
 
     std::mutex ui_tasks_mutex;
     std::queue<std::function<void()>> ui_tasks;
@@ -76,108 +79,11 @@ namespace {
         return narrow;
     }
 
-    using json_writer = rapidjson::Writer<rapidjson::StringBuffer>;
-
-    // builds {"type": type, ...} and posts it to the page
-    void post_to_page(const char* type, const std::function<void(json_writer&)>& fill = {}) {
-        if (!webview)
-            return;
-
-        rapidjson::StringBuffer buffer;
-        json_writer writer(buffer);
-        writer.StartObject();
-        writer.Key("type");
-        writer.String(type);
-        if (fill)
-            fill(writer);
-        writer.EndObject();
-
-        webview->PostWebMessageAsJson(to_wide(buffer.GetString()).c_str());
-    }
-
-    void post_error(const std::string& message) {
-        post_to_page("error", [&](json_writer& writer) {
-            writer.Key("message");
-            writer.String(message.c_str());
-        });
-    }
-
-    std::string current_player_name() {
-        std::string name = launcher::player_name();
-        return name.empty() ? "Unknown Soldier" : name;
-    }
-
-    void post_name() {
-        std::string name = current_player_name();
-        post_to_page("name", [&](json_writer& writer) {
-            writer.Key("name");
-            writer.String(name.c_str());
-        });
-    }
-
-    // the downloaded languages as an array, null when .build.info can't be read and the page marks nothing
-    void write_installed_languages(json_writer& writer) {
-        auto installed = launcher::installed_game_languages();
-        writer.Key("installedLanguages");
-        if (!installed) {
-            writer.Null();
-            return;
-        }
-
-        writer.StartArray();
-        for (const auto& code : *installed)
-            writer.String(code.c_str());
-        writer.EndArray();
-    }
-
-    void post_init() {
-        std::string name = current_player_name();
-        std::string version = updater::get_server_version();
-        bool game_found = !launcher::game_dir().empty();
-        std::string language = launcher::game_language();
-
-        post_to_page("init", [&](json_writer& writer) {
-            writer.Key("name");
-            writer.String(name.c_str());
-            writer.Key("version");
-            writer.String(version.c_str());
-            writer.Key("gameFound");
-            writer.Bool(game_found);
-            writer.Key("volume");
-            writer.Int(settings.volume);
-            writer.Key("closeOnPlay");
-            writer.Bool(settings.close_on_play);
-            writer.Key("language");
-            writer.String(language.c_str());
-            write_installed_languages(writer);
-        });
-    }
-
-    void post_client_config() {
-        std::vector<launcher::config_entry> entries;
-        std::string error;
-        if (!launcher::read_client_config(entries, error)) {
-            post_error(error);
-            return;
-        }
-
-        post_to_page("settings", [&](json_writer& writer) {
-            writer.Key("entries");
-            writer.StartArray();
-            for (const auto& entry : entries) {
-                writer.StartObject();
-                writer.Key("path");
-                writer.StartArray();
-                for (const auto& part : entry.path)
-                    writer.String(part.c_str());
-                writer.EndArray();
-                writer.Key("type");
-                writer.String(entry.type.c_str());
-                writer.Key("value");
-                writer.String(entry.value.c_str());
-                writer.EndObject();
-            }
-            writer.EndArray();
+    // the page already built the json, this is only the transport
+    void post_json(const std::string& json) {
+        run_on_ui([json] {
+            if (webview)
+                webview->PostWebMessageAsJson(to_wide(json).c_str());
         });
     }
 
@@ -203,94 +109,6 @@ namespace {
         mciSendStringW(L"play launcher_sound", nullptr, 0, nullptr);
     }
 
-    void check_for_updates() {
-        std::thread([] {
-            bool available = updater::check_for_updates();
-            if (!available)
-                return;
-
-            run_on_ui([] {
-                updater::mark_prompted();
-
-                std::string latest = updater::get_latest_version();
-                std::string current = updater::get_server_version();
-                post_to_page("update", [&](json_writer& writer) {
-                    writer.Key("latest");
-                    writer.String(latest.c_str());
-                    writer.Key("current");
-                    writer.String(current.c_str());
-                });
-            });
-        }).detach();
-    }
-
-    void start_update() {
-        if (updating)
-            return;
-
-        updating = true;
-        std::thread([] {
-            bool started = updater::download_and_update();
-            run_on_ui([started] {
-                updating = false;
-                if (started)
-                    DestroyWindow(main_window);
-                else
-                    post_error("The update could not be downloaded. Try again later.");
-            });
-        }).detach();
-    }
-
-    void post_play_failed(const std::string& error) {
-        post_to_page("playDone", [&](json_writer& writer) {
-            writer.Key("ok");
-            writer.Bool(false);
-            writer.Key("error");
-            writer.String(error.c_str());
-            writer.Key("closing");
-            writer.Bool(false);
-        });
-    }
-
-    void start_play(launcher::play_mode mode) {
-        if (playing)
-            return;
-
-        playing = true;
-        std::thread([mode] {
-            launcher::play(mode,
-                [](int value, const char* text) {
-                    std::string step = text;
-                    run_on_ui([value, step] {
-                        post_to_page("progress", [&](json_writer& writer) {
-                            writer.Key("value");
-                            writer.Int(value);
-                            writer.Key("text");
-                            writer.String(step.c_str());
-                        });
-                    });
-                },
-                [](bool ok, std::string error) {
-                    run_on_ui([ok, error] {
-                        playing = false;
-                        bool closing = ok && settings.close_on_play;
-
-                        post_to_page("playDone", [&](json_writer& writer) {
-                            writer.Key("ok");
-                            writer.Bool(ok);
-                            writer.Key("error");
-                            writer.String(error.c_str());
-                            writer.Key("closing");
-                            writer.Bool(closing);
-                        });
-
-                        if (closing)
-                            SetTimer(main_window, close_timer, 1000, nullptr);
-                    });
-                });
-        }).detach();
-    }
-
     // the page has no real borders, so its title bar and edges hand the mouse to windows' own move and size
     void start_system_drag(int hit) {
         POINT cursor;
@@ -299,111 +117,49 @@ namespace {
         SendMessageW(main_window, WM_NCLBUTTONDOWN, hit, MAKELPARAM(cursor.x, cursor.y));
     }
 
-    std::string string_member(const rapidjson::Value& object, const char* key) {
-        if (!object.IsObject() || !object.HasMember(key) || !object[key].IsString())
-            return "";
-        return object[key].GetString();
-    }
+    std::string pick_path(const std::string& title, bool folder) {
+        const std::wstring caption = to_wide(title);
 
-    bool read_entries(const rapidjson::Value& message, std::vector<launcher::config_entry>& entries) {
-        if (!message.HasMember("entries") || !message["entries"].IsArray())
-            return false;
+        if (folder) {
+            BROWSEINFOW browse = {};
+            browse.lpszTitle = caption.c_str();
+            browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_USENEWUI;
 
-        for (const auto& item : message["entries"].GetArray()) {
-            if (!item.IsObject() || !item.HasMember("path") || !item["path"].IsArray())
-                return false;
+            LPITEMIDLIST item = SHBrowseForFolderW(&browse);
+            if (!item)
+                return {};
 
-            launcher::config_entry entry;
-            for (const auto& part : item["path"].GetArray()) {
-                if (!part.IsString())
-                    return false;
-                entry.path.push_back(part.GetString());
-            }
-            entry.type = string_member(item, "type");
-            entry.value = string_member(item, "value");
-            entries.push_back(std::move(entry));
+            wchar_t path[MAX_PATH] = {};
+            const bool ok = SHGetPathFromIDListW(item, path);
+            CoTaskMemFree(item);
+            return ok ? to_utf8(path) : std::string();
         }
 
-        return true;
+        wchar_t path[MAX_PATH] = {};
+        OPENFILENAMEW dialog = { sizeof(dialog) };
+        dialog.hwndOwner = main_window;
+        dialog.lpstrFilter = L"Mod archives (*.zip)\0*.zip\0All files (*.*)\0*.*\0";
+        dialog.lpstrFile = path;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrTitle = caption.c_str();
+        dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+
+        return GetOpenFileNameW(&dialog) ? to_utf8(path) : std::string();
     }
 
-    void post_dedicated_settings() {
-        launcher::dedicated_settings values = launcher::read_dedicated_settings();
+    page::host build_host() {
+        page::host callbacks;
 
-        post_to_page("dedicated", [&](json_writer& writer) {
-            writer.Key("values");
-            writer.StartObject();
-            writer.Key("name");
-            writer.String(values.name.c_str());
-            writer.Key("lobby");
-            writer.String(values.lobby.c_str());
-            writer.Key("playlist");
-            writer.Int(values.playlist);
-            writer.Key("rotation");
-            writer.String(values.rotation.c_str());
-            writer.Key("min_players");
-            writer.Int(values.min_players);
-            writer.Key("lobby_seconds");
-            writer.Int(values.lobby_seconds);
-            writer.Key("draw");
-            writer.String(values.draw.c_str());
-            writer.Key("max_fps");
-            writer.Int(values.max_fps);
-            writer.Key("minimize");
-            writer.Bool(values.minimize);
-            writer.Key("streaming");
-            writer.Bool(values.streaming);
-            writer.Key("background");
-            writer.Bool(values.background);
-            writer.EndObject();
-        });
-    }
-
-    // what the page sent over the saved values, anything missing or of the wrong type keeps its saved value
-    launcher::dedicated_settings read_dedicated_values(const rapidjson::Value& page) {
-        launcher::dedicated_settings values = launcher::read_dedicated_settings();
-
-        auto read_string = [&](const char* key, std::string& target) {
-            if (page.HasMember(key) && page[key].IsString())
-                target = page[key].GetString();
+        callbacks.open_url = [](const std::string& url) {
+            open_url(to_wide(url).c_str());
         };
-        auto read_int = [&](const char* key, int& target) {
-            if (page.HasMember(key) && page[key].IsInt())
-                target = page[key].GetInt();
-        };
-        auto read_bool = [&](const char* key, bool& target) {
-            if (page.HasMember(key) && page[key].IsBool())
-                target = page[key].GetBool();
-        };
+        callbacks.close_window = [] { DestroyWindow(main_window); };
+        callbacks.minimize_window = [] { ShowWindow(main_window, SW_MINIMIZE); };
+        callbacks.close_for_update = [] { DestroyWindow(main_window); };
+        callbacks.set_sound_volume = [](int volume) { set_sound_volume(volume); };
+        callbacks.play_startup_sound = [] { SetTimer(main_window, sound_timer, 1000, nullptr); };
 
-        read_string("name", values.name);
-        read_string("lobby", values.lobby);
-        read_int("playlist", values.playlist);
-        read_string("rotation", values.rotation);
-        read_int("min_players", values.min_players);
-        read_int("lobby_seconds", values.lobby_seconds);
-        read_string("draw", values.draw);
-        read_int("max_fps", values.max_fps);
-        read_bool("minimize", values.minimize);
-        read_bool("streaming", values.streaming);
-        read_bool("background", values.background);
-        return values;
-    }
-
-    void on_page_message(const std::string& json) {
-        rapidjson::Document message;
-        message.Parse(json.c_str());
-        if (message.HasParseError() || !message.IsObject())
-            return;
-
-        std::string action = string_member(message, "action");
-
-        if (action == "ready") {
-            post_init();
-            check_for_updates();
-            SetTimer(main_window, sound_timer, 1000, nullptr);
-        }
-        else if (action == "drag") {
+        callbacks.start_drag = [] {
             // the move loop eats the page's clicks, so a double click on the title bar is spotted here
             static DWORD last_time = 0;
             static POINT last_point = {};
@@ -422,94 +178,29 @@ namespace {
                 ShowWindow(main_window, IsZoomed(main_window) ? SW_RESTORE : SW_MAXIMIZE);
             else
                 start_system_drag(HTCAPTION);
-        }
-        else if (action == "resize") {
+        };
+
+        callbacks.start_resize = [](const std::string& edge) {
             static const std::pair<const char*, int> edges[] = {
                 { "n", HTTOP }, { "s", HTBOTTOM }, { "e", HTRIGHT }, { "w", HTLEFT },
                 { "ne", HTTOPRIGHT }, { "nw", HTTOPLEFT }, { "se", HTBOTTOMRIGHT }, { "sw", HTBOTTOMLEFT },
             };
 
-            std::string edge = string_member(message, "edge");
             for (const auto& [name, hit] : edges) {
                 if (edge == name && !IsZoomed(main_window))
                     start_system_drag(hit);
             }
-        }        else if (action == "minimize") {
-            ShowWindow(main_window, SW_MINIMIZE);
-        }
-        else if (action == "close") {
-            DestroyWindow(main_window);
-        }
-        else if (action == "discord") {
-            open_url(L"https://discord.gg/AXECAzJJGU");
-        }
-        else if (action == "docs") {
-            open_url(L"https://shield-client.gitbook.io/shield-documentation");
-        }
-        else if (action == "play") {
-            start_play(string_member(message, "mode") == "vanilla" ? launcher::play_mode::vanilla : launcher::play_mode::client);
-        }
-        else if (action == "openDedicated") {
-            post_dedicated_settings();
-        }
-        else if (action == "launchDedicated" && !playing) {
-            std::string error;
-            if (!message.HasMember("values") || !message["values"].IsObject())
-                post_play_failed("The dedicated settings could not be read.");
-            else if (!launcher::write_dedicated_settings(read_dedicated_values(message["values"]), error))
-                post_play_failed(error);
-            else
-                start_play(launcher::play_mode::dedicated);
-        }
-        else if (action == "setName") {
-            std::string name = string_member(message, "name");
-            if (name.empty())
-                post_error("Name cannot be empty!");
-            else if (!launcher::set_player_name(name))
-                post_error("Failed to save name!");
-            else
-                post_name();
-        }
-        else if (action == "volume" && message.HasMember("value") && message["value"].IsInt()) {
-            settings.volume = std::clamp(message["value"].GetInt(), 0, 100);
-            set_sound_volume(settings.volume);
-            if (message.HasMember("save") && message["save"].IsTrue())
-                launcher::save_volume(settings.volume);
-        }
-        else if (action == "closeOnPlay" && message.HasMember("value") && message["value"].IsBool()) {
-            settings.close_on_play = message["value"].GetBool();
-            launcher::save_close_on_play(settings.close_on_play);
-        }
-        else if (action == "language") {
-            if (!launcher::set_game_language(string_member(message, "value")))
-                post_error("Failed to save the game language!");
-        }
-        else if (action == "languages") {
-            post_to_page("languages", write_installed_languages);
-        }
-        else if (action == "openSettings") {
-            post_client_config();
-        }
-        else if (action == "saveSettings") {
-            std::vector<launcher::config_entry> entries;
-            std::string error;
-            if (!read_entries(message, entries))
-                post_error("The settings could not be read.");
-            else if (!launcher::write_client_config(entries, error))
-                post_error(error);
-            else {
-                post_to_page("settingsSaved");
-                post_name();
-            }
-        }
-        else if (action == "resetSettings") {
-            launcher::reset_client_config();
-            post_client_config();
-            post_name();
-        }
-        else if (action == "update") {
-            start_update();
-        }
+        };
+
+        callbacks.run_async = [](std::function<void()> task) {
+            std::thread(std::move(task)).detach();
+        };
+
+        callbacks.pick_path = [](const std::string& title, bool folder) {
+            return pick_path(title, folder);
+        };
+
+        return callbacks;
     }
 
     // the page and its files are built into the exe, the background art is read from images
@@ -632,8 +323,8 @@ namespace {
         webview->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(
             [](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
                 LPWSTR json = nullptr;
-                if (SUCCEEDED(args->get_WebMessageAsJson(&json)) && json)
-                    on_page_message(to_utf8(json));
+                if (SUCCEEDED(args->get_WebMessageAsJson(&json)) && json && page_controller)
+                    page_controller->handle(to_utf8(json));
                 CoTaskMemFree(json);
                 return S_OK;
             }).Get(), nullptr);
@@ -683,10 +374,8 @@ namespace {
         switch (message) {
         case WM_SIZE:
             resize_webview();
-            post_to_page("window", [&](json_writer& writer) {
-                writer.Key("maximized");
-                writer.Bool(wparam == SIZE_MAXIMIZED);
-            });
+            if (page_controller)
+                page_controller->post_window_state(wparam == SIZE_MAXIMIZED);
             return 0;
 
         // the thick frame is only kept for sizing and snapping, the whole window is client area
@@ -808,6 +497,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show) {
     DWM_WINDOW_CORNER_PREFERENCE corners = DWMWCP_ROUND;
     DwmSetWindowAttribute(main_window, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners));
 
+    page_controller = std::make_unique<page::controller>(settings, build_host(), post_json);
+
     ShowWindow(main_window, show);
     UpdateWindow(main_window);
 
@@ -816,7 +507,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show) {
     MSG message;
     while (GetMessageW(&message, nullptr, 0, 0)) {
         TranslateMessage(&message);
-        DispatchMessageW(&message);
+        DispatchMessage(&message);
     }
 
     CoUninitialize();

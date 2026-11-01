@@ -1,0 +1,127 @@
+name: build
+
+on:
+  # branches only: a tag is a release, and release.yml already builds it
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  # called by release.yml, the artifacts of this run are the release files
+  workflow_call:
+
+jobs:
+  windows:
+    name: Windows (MSVC, WebView2)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      # the repo ships the premake the solution is written for, a downloaded one
+      # can be a different beta and reject the api used in premake5.lua
+      - name: Fetch premake5
+        if: ${{ hashFiles('tools/premake5.exe') == '' }}
+        shell: pwsh
+        run: |
+          curl -L -o premake.zip https://github.com/premake/premake-core/releases/download/v5.0.0-beta7/premake-5.0.0-beta7-windows.zip
+          Expand-Archive premake.zip -DestinationPath tools -Force
+
+      - name: Generate solution
+        run: tools\premake5.exe vs2022
+
+      # the WebView2 sdk comes from a packages.config nuget, the ide restores it on
+      # build and msbuild on its own does not
+      - name: Restore packages
+        run: msbuild build\Shield_launcher.sln /t:Restore /p:RestorePackagesConfig=true /p:Configuration=Release /p:Platform=x64
+
+      - name: Build
+        run: msbuild build\Shield_launcher.sln /m /p:Configuration=Release /p:Platform=x64
+
+      - name: Package launcher folder
+        shell: pwsh
+        run: |
+          # the launcher goes at the game root: drop the folder content in it
+          $out = "dist/Project_BO4_Launcher_Windows"
+          $release = "build/bin/x64/Release"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          Copy-Item "$release/Shield_Launcher.exe" $out
+
+          # launcher resources: images, LPC, Sounds and the shipped default configs
+          $resources = "project-bo4/Latest-Release-Files/project-bo4/launcher"
+          $dest = "$out/project-bo4/launcher"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          foreach ($item in @("images", "LPC", "Sounds")) {
+            if (Test-Path "$resources/$item") {
+              Copy-Item "$resources/$item" $dest -Recurse
+            }
+          }
+          foreach ($item in @("launcher-config.json", "project-bo4.json")) {
+            if (Test-Path "$resources/$item") {
+              Copy-Item "$resources/$item" $dest
+            }
+          }
+
+          # the client refuses to start without project-bo4/zone/support.ff and
+          # project-bo4/internals/T8ShieldSupport, and they only come from here
+          $support = "project-bo4/Latest-Release-Files/project-bo4"
+          foreach ($item in @("zone", "zone_mods", "internals", "music_manager")) {
+            if (Test-Path "$support/$item") {
+              Copy-Item "$support/$item" "$out/project-bo4" -Recurse
+            }
+          }
+
+          Compress-Archive -Path $out -DestinationPath dist/Project_BO4_Launcher_Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-windows
+          path: dist/Project_BO4_Launcher_Windows.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux (CMake, WebKitGTK)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GTK, WebKitGTK and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+            libgtk-3-dev libwebkit2gtk-4.1-dev zlib1g-dev
+
+      - name: Build
+        run: ./build-linux.sh release
+
+      - name: Package
+        run: |
+          # same layout as the Windows archive: the launcher at the game root
+          out=dist/Project_BO4_Launcher_Linux
+          mkdir -p "$out/project-bo4/launcher"
+          cp build/linux/Shield_Launcher "$out/"
+          chmod +x "$out/Shield_Launcher"
+
+          resources=project-bo4/Latest-Release-Files/project-bo4/launcher
+          for item in images LPC Sounds; do
+            if [ -d "$resources/$item" ]; then cp -r "$resources/$item" "$out/project-bo4/launcher/"; fi
+          done
+          for item in launcher-config.json project-bo4.json; do
+            if [ -f "$resources/$item" ]; then cp "$resources/$item" "$out/project-bo4/launcher/"; fi
+          done
+
+          # the client refuses to start without project-bo4/zone/support.ff and
+          # project-bo4/internals/T8ShieldSupport, and they only come from here
+          support=project-bo4/Latest-Release-Files/project-bo4
+          for item in zone zone_mods internals music_manager; do
+            if [ -d "$support/$item" ]; then cp -r "$support/$item" "$out/project-bo4/"; fi
+          done
+
+          tar -czf dist/Project_BO4_Launcher_Linux.tar.gz -C dist Project_BO4_Launcher_Linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux
+          path: dist/Project_BO4_Launcher_Linux.tar.gz
+          if-no-files-found: error

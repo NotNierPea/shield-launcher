@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4100)
 #pragma warning(disable: 4127)
@@ -22,8 +23,9 @@
 #pragma warning(disable: 26498)
 #pragma warning(disable: 26812)
 #pragma warning(disable: 28020)
+#endif
 
-
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 
 #include <Windows.h>
@@ -41,11 +43,8 @@
 #include <VersionHelpers.h>
 #include <Psapi.h>
 #include <urlmon.h>
-#include <atlbase.h>
 #include <iphlpapi.h>
 #include <wincrypt.h>
-#include <set>
-#include <filesystem>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 
@@ -57,7 +56,20 @@
 #ifdef min
 #undef min
 #endif
+#else
+// the Linux host has no Win32 at all, only the plain runtime
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#endif
 
+#include <set>
+#include <filesystem>
 #include <map>
 #include <atomic>
 #include <vector>
@@ -69,13 +81,14 @@
 #include <fstream>
 #include <iostream>
 #include <utility>
-#include <filesystem>
 #include <functional>
 #include <sstream>
 #include <optional>
+#include <memory>
 #include <unordered_set>
 #include <variant>
-#include <fstream>
+#include <algorithm>
+#include <string>
 
 
 #include <rapidjson/document.h>
@@ -85,22 +98,20 @@
 #include <rapidjson/filereadstream.h>
 #include <rapidjson/filewritestream.h>
 
-
+#ifdef _MSC_VER
 #pragma warning(pop)
 #pragma warning(disable: 4100)
+#endif
 
+#ifdef _WIN32
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "urlmon.lib" )
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "Crypt32.lib")
 #pragma comment(lib, "Pdh.lib") //pc stats (cpu ram ect)
-
-
 #pragma comment(lib, "bcrypt.lib") // libevent-arc4random
-//#pragma comment(lib, "glog.lib") 
+#endif
 
 
 using namespace std::literals;
-
-

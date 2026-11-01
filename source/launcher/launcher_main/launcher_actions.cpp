@@ -3,6 +3,7 @@
 #include "utils.hpp"
 #include "../launcher_funcs/dll_loading.hpp"
 #include "../launcher_funcs/json_utils.hpp"
+#include "../launcher_funcs/linux_run.hpp"
 #include <algorithm>
 #include <charconv>
 
@@ -179,10 +180,49 @@ namespace launcher {
         }
     }
 
-    fs::path launcher_dir() {
+    fs::path executable_path() {
+#ifdef _WIN32
         wchar_t buffer[MAX_PATH];
         GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-        return fs::path(buffer).parent_path();
+        return fs::path(buffer);
+#else
+        // /proc/self/exe survives symlinks and renames
+        std::error_code ec;
+        const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
+        return exe.empty() ? fs::current_path() / "Shield_Launcher" : exe;
+#endif
+    }
+
+    fs::path launcher_dir() {
+        const fs::path exe_dir = executable_path().parent_path();
+
+        // the launcher sits either next to its files or at the game root, with
+        // project-bo4/launcher holding images, LPC, Sounds and the zips
+        auto has_resources = [](const fs::path& dir) {
+            std::error_code ec;
+            for (const char* marker : { "exe.zip", "solo.zip", "mp.zip", "images" }) {
+                if (fs::exists(dir / marker, ec))
+                    return true;
+            }
+            return false;
+        };
+
+        if (has_resources(exe_dir))
+            return exe_dir;
+
+        const fs::path nested = exe_dir / "project-bo4" / "launcher";
+        if (has_resources(nested))
+            return nested;
+
+        return exe_dir;
+    }
+
+    std::string platform() {
+#ifdef _WIN32
+        return "windows";
+#else
+        return "linux";
+#endif
     }
 
     fs::path game_dir() {
@@ -219,11 +259,14 @@ namespace launcher {
     }
 
     // battle.net's launch options of BO4, the game reads its language from here
+#ifdef _WIN32
     constexpr const wchar_t* launch_options_key = L"Software\\Blizzard Entertainment\\Battle.net\\Launch Options\\VIPR";
 
     // the languages battle.net offers for BO4
     constexpr const char* game_languages[] = { "enUS", "frFR", "deDE", "itIT", "esES", "jaJP", "ruRU", "koKR", "ptBR", "esMX", "zhTW", "plPL" };
+#endif
 
+#ifdef _WIN32
     std::string game_language() {
         wchar_t value[16] = {};
         DWORD size = sizeof(value);
@@ -246,12 +289,15 @@ namespace launcher {
         // text and speech both, as battle.net writes them when its language is changed
         std::wstring value(locale.begin(), locale.end());
         const auto bytes = static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t));
-        bool ok = RegSetValueExW(key, L"LOCALE", 0, REG_SZ, reinterpret_cast<const BYTE*>(value.c_str()), bytes) == ERROR_SUCCESS
-            && RegSetValueExW(key, L"LOCALE_AUDIO", 0, REG_SZ, reinterpret_cast<const BYTE*>(value.c_str()), bytes) == ERROR_SUCCESS;
+        bool ok = RegSetValueExW(key, L"LOCALE", 0,
+                       REG_SZ, reinterpret_cast<const BYTE*>(value.c_str()), bytes) == ERROR_SUCCESS
+            && RegSetValueExW(key, L"LOCALE_AUDIO", 0,
+                       REG_SZ, reinterpret_cast<const BYTE*>(value.c_str()), bytes) == ERROR_SUCCESS;
 
         RegCloseKey(key);
         return ok;
     }
+#endif
 
     std::optional<std::vector<std::string>> installed_game_languages() {
         const fs::path game = game_dir();
@@ -456,8 +502,15 @@ namespace launcher {
             fs::path plugins = game / "project-bo4" / "plugins";
             if (fs::exists(plugins)) {
                 for (const auto& entry : fs::directory_iterator(plugins)) {
+#ifdef _WIN32
                     if (_wcsicmp(entry.path().stem().c_str(), L"acts-shield-plugin") != 0)
                         continue;
+#else
+                    std::string stem = entry.path().stem().string();
+                    std::transform(stem.begin(), stem.end(), stem.begin(), [](unsigned char c) { return std::tolower(c); });
+                    if (stem != "acts-shield-plugin")
+                        continue;
+#endif
 
                     std::error_code ec;
                     fs::remove(entry.path(), ec);
@@ -479,10 +532,15 @@ namespace launcher {
         try {
             progress(15, "Copying LPC files");
 
+            // the launcher sits either at the game root or in project-bo4/launcher
             fs::path current = launcher_dir();
+            fs::path game = game_dir();
+            if (game.empty())
+                game = current.parent_path().parent_path();
+
             fs::path lpc = current / "LPC";
             if (fs::exists(lpc))
-                utils::copyDirectoryRecursive(lpc.string(), (current.parent_path().parent_path() / "LPC").string());
+                utils::copyDirectoryRecursive(lpc.string(), (game / "LPC").string());
 
             progress(25, vanilla ? "Starting vanilla" : "Copying the client");
 
@@ -510,8 +568,8 @@ namespace launcher {
             fs::path exe_path;
             if (fs::exists(current / exe_name))
                 exe_path = current / exe_name;
-            else if (fs::exists(current.parent_path().parent_path() / exe_name))
-                exe_path = current.parent_path().parent_path() / exe_name;
+            else if (fs::exists(game / exe_name))
+                exe_path = game / exe_name;
             else {
                 done(false, std::string("Could not locate ") + exe_name + "!");
                 return;
