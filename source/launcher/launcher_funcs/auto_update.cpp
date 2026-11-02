@@ -11,7 +11,7 @@
 #include <filesystem>
 
 namespace updater {
-    const std::string SERVER_VERSION = "1.1.2";
+    const std::string SERVER_VERSION = "1.1.3";
 
     const std::string GITHUB_API_URL = "https://api.github.com/repos/NotNierPea/shield-launcher/releases/latest";
     const std::string DOWNLOAD_URL_BASE = "https://github.com/NotNierPea/shield-launcher/releases/download/";
@@ -203,6 +203,9 @@ namespace updater {
         char tempPath[MAX_PATH];
         GetTempPathA(MAX_PATH, tempPath);
         std::string updateDir = std::string(tempPath) + "\\bo4_update";
+        // a failed update leaves its files here, and an older layout's folder would be picked first
+        std::error_code ec;
+        std::filesystem::remove_all(updateDir, ec);
         CreateDirectoryA(updateDir.c_str(), NULL);
 
         std::string downloadUrl = DOWNLOAD_URL_BASE + latestVersion + "/" + assetName;
@@ -218,6 +221,8 @@ namespace updater {
         std::string exeDir = currentExe.substr(0, currentExe.find_last_of("\\"));
         std::string exeName = currentExe.substr(currentExe.find_last_of("\\") + 1);
         std::string projectDir = exeDir.substr(0, exeDir.find_last_of("\\"));  // Get parent directory (project-bo4)
+        std::string gameDir = projectDir.substr(0, projectDir.find_last_of("\\"));
+        std::string filesDir = updateDir + "\\files";  // the zip's contents, apart from the zip and the script
         std::string updateBatchPath = updateDir + "\\update.bat";
 
         logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Current exe: %s", currentExe.c_str());
@@ -277,7 +282,7 @@ namespace updater {
         batchContent += "ping -n 5 127.0.0.1 > nul\r\n"; 
 
         batchContent += "echo Extracting update files...\r\n";
-        batchContent += "powershell -Command \"Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + updateDir + "' -Force\"\r\n";
+        batchContent += "powershell -Command \"Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + filesDir + "' -Force\"\r\n";
         batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
         batchContent += "  echo Failed to extract update files!\r\n";
         batchContent += "  pause\r\n";
@@ -288,40 +293,60 @@ namespace updater {
         batchContent += "taskkill /f /im \"" + exeName + "\" > nul 2>&1\r\n";
         batchContent += "ping -n 2 127.0.0.1 > nul\r\n";
         
+        // every copy is checked: xcopy stops at the first file it can't write (1 is only "no files", an empty folder)
+        const std::string checkCopy = "if errorlevel 2 set FAILED=1\r\n";
+
         batchContent += "echo Checking for update files...\r\n";
-        batchContent += "if exist \"" + updateDir + "\\Project_BO4\\*\" (\r\n";
-        batchContent += "  echo Found nested Project_BO4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\Project_BO4\\*\" \"" + projectDir + "\\\" > nul\r\n";
-        batchContent += ") else if exist \"" + updateDir + "\\project-bo4\\*\" (\r\n";
-        batchContent += "  echo Found nested project-bo4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\project-bo4\\*\" \"" + projectDir + "\\\" > nul\r\n";
-        batchContent += ") else if exist \"" + updateDir + "\\launcher\\*\" (\r\n";
-        batchContent += "  echo Found launcher folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\launcher\\*\" \"" + exeDir + "\\\" > nul\r\n";
-        batchContent += "  for /d %%i in (\"" + updateDir + "\\*\") do (\r\n";
-        batchContent += "    if not \"%%~nxi\"==\"launcher\" xcopy /s /y \"%%i\\*\" \"" + projectDir + "\\%%~nxi\\\" > nul\r\n";
-        batchContent += "  )\r\n";
-        batchContent += ") else (\r\n";
-        batchContent += "  echo Using root folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += "set FAILED=\r\n";
+        batchContent += "set NESTED=\r\n";
+        batchContent += "if exist \"" + filesDir + "\\Project_BO4\\*\" set NESTED=Project_BO4\r\n";
+        batchContent += "if exist \"" + filesDir + "\\project-bo4\\*\" set NESTED=project-bo4\r\n";
+        batchContent += "if defined NESTED goto nested\r\n";
+        batchContent += "if exist \"" + filesDir + "\\launcher\\*\" goto launcher\r\n";
+
+        batchContent += "echo Using root folder\r\n";
+        batchContent += "xcopy /s /y /r /h \"" + filesDir + "\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += checkCopy;
+        batchContent += "goto copied\r\n";
+
+        // the zip is laid out like the game folder: project-bo4 beside the game's own files (LPC, discord sdk, old exe)
+        batchContent += ":nested\r\n";
+        batchContent += "echo Found nested %NESTED% folder\r\n";
+        batchContent += "xcopy /s /y /r /h \"" + filesDir + "\\%NESTED%\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += checkCopy;
+        batchContent += "for %%f in (\"" + filesDir + "\\*\") do (\r\n";
+        batchContent += "  xcopy /y /r /h \"%%f\" \"" + gameDir + "\\\" > nul\r\n";
+        batchContent += "  " + checkCopy;
         batchContent += ")\r\n";
-        
-        batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
+        batchContent += "for /d %%i in (\"" + filesDir + "\\*\") do if /i not \"%%~nxi\"==\"%NESTED%\" (\r\n";
+        batchContent += "  xcopy /s /y /r /h \"%%i\\*\" \"" + gameDir + "\\%%~nxi\\\" > nul\r\n";
+        batchContent += "  " + checkCopy;
+        batchContent += ")\r\n";
+        batchContent += "goto copied\r\n";
+
+        batchContent += ":launcher\r\n";
+        batchContent += "echo Found launcher folder\r\n";
+        batchContent += "xcopy /s /y /r /h \"" + filesDir + "\\launcher\\*\" \"" + exeDir + "\\\" > nul\r\n";
+        batchContent += checkCopy;
+        batchContent += "for /d %%i in (\"" + filesDir + "\\*\") do if not \"%%~nxi\"==\"launcher\" (\r\n";
+        batchContent += "  xcopy /s /y /r /h \"%%i\\*\" \"" + projectDir + "\\%%~nxi\\\" > nul\r\n";
+        batchContent += "  " + checkCopy;
+        batchContent += ")\r\n";
+
+        batchContent += ":copied\r\n";
+        batchContent += "if defined FAILED (\r\n";
         batchContent += "  echo Failed to copy update files!\r\n";
         batchContent += "  pause\r\n";
         batchContent += "  exit /b 1\r\n";
         batchContent += ")\r\n";
 
-        batchContent += "echo Cleaning up...\r\n";
-        batchContent += "del \"" + zipPath + "\" > nul\r\n";
-        batchContent += "rmdir /s /q \"" + updateDir + "\" > nul\r\n";
-
         batchContent += "echo Starting launcher...\r\n";
         batchContent += "start \"\" \"" + exeDir + "\\" + exeName + "\"\r\n";
         batchContent += "echo Update complete!\r\n";
         batchContent += "timeout /t 3\r\n";
-        batchContent += "del \"%~f0\"\r\n";
-        batchContent += "exit\r\n";
+
+        // this script is in the folder: cmd reads it line by line, so the clean up has to be the last line
+        batchContent += "rmdir /s /q \"" + updateDir + "\" > nul 2>&1 & exit\r\n";
 
         std::ofstream batchFile(updateBatchPath);
         batchFile << batchContent;
