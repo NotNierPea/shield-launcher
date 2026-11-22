@@ -67,6 +67,10 @@
 
       <div class="chips">
         <span class="chip"><span>Launcher v<span id="version">-</span></span></span>
+        <button class="chip chip-btn" id="files-chip" title="Game files">
+          <span class="dot" id="files-dot"></span>
+          <span id="files-chip-text">Checking game files…</span>
+        </button>
       </div>
     </section>
   </main>
@@ -221,12 +225,37 @@
     </form>
   </dialog>
 
+  <dialog class="modal wide" id="files-dialog" aria-labelledby="files-title">
+    <form method="dialog" id="files-form">
+      <div class="modal-head">
+        <h3 id="files-title">Game files</h3>
+        <span class="modal-hint" id="files-version"></span>
+      </div>
+      <p class="modal-text files-summary" id="files-summary">Checking game files…</p>
+      <div class="settings-body files-body" id="files-body"></div>
+      <div class="files-progress" id="files-progress" hidden>
+        <div class="bar"><span id="files-bar"></span></div>
+        <div class="files-progress-text">
+          <span id="files-progress-file"></span>
+          <span id="files-progress-numbers"></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="files-verify" title="Hash every file again instead of trusting the last check">Verify files</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn-ghost" data-close>Close</button>
+        <button type="button" class="btn-ghost danger" id="files-cancel" hidden>Cancel</button>
+        <button type="button" class="btn-solid" id="files-download" disabled>Download all</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="modal" id="update-dialog" aria-labelledby="update-title">
     <form method="dialog">
       <h3 id="update-title">Update available</h3>
       <p class="modal-text" id="update-text"></p>
       <div class="modal-actions">
-        <button type="button" class="btn-ghost" data-close>Later</button>
+        <button type="button" class="btn-ghost" id="update-later" data-close>Later</button>
         <button type="button" class="btn-solid" id="update-now">Update now</button>
       </div>
     </form>

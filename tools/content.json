@@ -1,0 +1,68 @@
+{
+    "repo": "NotNierPea/shield-launcher",
+    "tag": "content",
+    "part_size": 268435456,
+
+    "vars": {
+        "RELEASE": "../project-bo4/Latest-Release-Files",
+        "GAME": "C:/Program Files (x86)/Call of Duty Black Ops 4",
+        "CUSTOM_MAPS": "../../BO4 Custom Maps"
+    },
+
+    "launcher": "../build/bin/x64/Release/Shield_Launcher.exe",
+    "client_version_file": "../../shield-client/source/proxy-dll/component/watermark.hpp",
+    "client_dll": "project-bo4/launcher/XInput9_1_0.dll",
+
+    "base_zip": [
+        { "from": "${RELEASE}/Launch Project BO4.exe", "to": "Launch Project BO4.exe" },
+        { "from": "../build/bin/x64/Release/Shield_Launcher.exe", "to": "project-bo4/launcher/Shield_Launcher.exe" },
+        { "from": "${RELEASE}/project-bo4/launcher/images", "to": "project-bo4/launcher/images" },
+        { "from": "${RELEASE}/project-bo4/launcher/Sounds", "to": "project-bo4/launcher/Sounds" }
+    ],
+
+    "components": [
+        {
+            "id": "game",
+            "name": "Game",
+            "description": "Black Ops 4 exe, Shield client and LPC files",
+            "required": true,
+            "files": [
+                { "from": "${RELEASE}/project-bo4/launcher/exe.zip", "to": "project-bo4/launcher/exe.zip" },
+                { "from": "${GAME}/XInput9_1_0.dll", "to": "project-bo4/launcher/XInput9_1_0.dll" },
+                { "from": "${RELEASE}/project-bo4/launcher/LPC", "to": "project-bo4/launcher/LPC" },
+                { "from": "${RELEASE}/discord_game_sdk.dll", "to": "discord_game_sdk.dll" }
+            ]
+        },
+        {
+            "id": "support",
+            "name": "Support mod",
+            "description": "Lua, scripts, data and fastfiles",
+            "required": true,
+            "files": [
+                { "from": "${GAME}/project-bo4/internals/T8ShieldSupport", "to": "project-bo4/internals/T8ShieldSupport", "exclude": ["*.luadebug"], "package": "project-bo4/launcher/packages/T8ShieldSupport.zip" },
+                { "from": "${GAME}/project-bo4/zone_mods/T8ShieldSupport_FF/config.json", "to": "project-bo4/zone_mods/T8ShieldSupport_FF/config.json" },
+                { "from": "${GAME}/project-bo4/zone/support.ff", "to": "project-bo4/zone/support.ff" },
+                { "from": "${GAME}/project-bo4/zone/support.xpak", "to": "project-bo4/zone/support.xpak" },
+                { "from": "${GAME}/project-bo4/zone/snd/all/support.all.sabs", "to": "project-bo4/zone/snd/all/support.all.sabs" },
+                { "from": "${GAME}/project-bo4/package_index/support.wni", "to": "project-bo4/package_index/support.wni" },
+                { "from": "${GAME}/project-bo4/zone/support_mp.ff", "to": "project-bo4/zone/support_mp.ff" },
+                { "from": "${GAME}/project-bo4/package_index/support_mp.wni", "to": "project-bo4/package_index/support_mp.wni" },
+                { "from": "${GAME}/project-bo4/zone/support_zm.ff", "to": "project-bo4/zone/support_zm.ff" },
+                { "from": "${GAME}/project-bo4/zone/support_zm.xpak", "to": "project-bo4/zone/support_zm.xpak" },
+                { "from": "${GAME}/project-bo4/package_index/support_zm.wni", "to": "project-bo4/package_index/support_zm.wni" },
+                { "from": "${RELEASE}/project-bo4/music_manager/music/add your own musics here.txt", "to": "project-bo4/music_manager/music/add your own musics here.txt" }
+            ]
+        },
+        {
+            "id": "mp_targetrange",
+            "name": "Target Range",
+            "description": "The map the support mod's Target Range plays on",
+            "required": true,
+            "files": [
+                { "from": "${CUSTOM_MAPS}/Target Range (BO4)/release/mp_targetrange", "to": "project-bo4", "exclude": ["shield_map.json"] }
+            ]
+        }
+    ],
+
+    "remove": []
+}

@@ -1,1 +1,4 @@
 /build
+
+# python caches of the tools
+__pycache__/

@@ -1,6 +1,6 @@
 #include "std_include.hpp"
 #include "launcher_actions.hpp"
-#include "../launcher_funcs/auto_update.hpp"
+#include "../launcher_funcs/content_update.hpp"
 #include <algorithm>
 #include <dwmapi.h>
 #include <mmsystem.h>
@@ -35,7 +35,12 @@ namespace {
 
     launcher::settings settings;
     bool playing = false;
-    bool updating = false;
+
+    // the last check of the game files, and what the content worker is doing ("", "check", "download", "launcher")
+    std::shared_ptr<content::status> content_status;
+    std::string content_task;
+    std::atomic<bool> content_cancel{ false };
+    bool launcher_update_offered = false;
 
     std::mutex ui_tasks_mutex;
     std::queue<std::function<void()>> ui_tasks;
@@ -132,7 +137,7 @@ namespace {
 
     void post_init() {
         std::string name = current_player_name();
-        std::string version = updater::get_server_version();
+        std::string version = content::launcher_version();
         bool game_found = !launcher::game_dir().empty();
         std::string language = launcher::game_language();
 
@@ -203,42 +208,225 @@ namespace {
         mciSendStringW(L"play launcher_sound", nullptr, 0, nullptr);
     }
 
-    void check_for_updates() {
-        std::thread([] {
-            bool available = updater::check_for_updates();
-            if (!available)
-                return;
+    /* game files: the check, the download of everything missing, and the launcher's own update */
 
-            run_on_ui([] {
-                updater::mark_prompted();
+    const char* state_name(content::file_state state) {
+        switch (state) {
+        case content::file_state::missing: return "missing";
+        case content::file_state::outdated: return "outdated";
+        default: return "installed";
+        }
+    }
 
-                std::string latest = updater::get_latest_version();
-                std::string current = updater::get_server_version();
-                post_to_page("update", [&](json_writer& writer) {
-                    writer.Key("latest");
-                    writer.String(latest.c_str());
-                    writer.Key("current");
-                    writer.String(current.c_str());
+    void post_content_status() {
+        if (!content_status)
+            return;
+
+        const content::status& current = *content_status;
+        post_to_page("content", [&](json_writer& writer) {
+            writer.Key("ok");
+            writer.Bool(current.ok);
+            writer.Key("error");
+            writer.String(current.error.c_str());
+            writer.Key("version");
+            writer.String(current.data.version.c_str());
+            writer.Key("ready");
+            writer.Bool(current.ready);
+            writer.Key("download");
+            writer.Uint64(current.download);
+            writer.Key("launcherUpdate");
+            writer.Bool(current.launcher_update);
+            writer.Key("launcherLatest");
+            writer.String(current.data.launcher_version.c_str());
+
+            writer.Key("components");
+            writer.StartArray();
+            for (const auto& owner : current.components) {
+                writer.StartObject();
+                writer.Key("id");
+                writer.String(owner.info.id.c_str());
+                writer.Key("name");
+                writer.String(owner.info.name.c_str());
+                writer.Key("description");
+                writer.String(owner.info.description.c_str());
+                writer.Key("required");
+                writer.Bool(owner.info.required);
+                writer.Key("state");
+                writer.String(state_name(owner.state));
+                writer.Key("size");
+                writer.Uint64(owner.size);
+                writer.Key("download");
+                writer.Uint64(owner.download);
+                writer.Key("files");
+                writer.StartArray();
+                for (const auto& state : owner.files) {
+                    const auto& file = current.data.files[state.index];
+                    writer.StartObject();
+                    writer.Key("path");
+                    writer.String(file.path.c_str());
+                    writer.Key("size");
+                    writer.Uint64(file.size);
+                    writer.Key("download");
+                    writer.Uint64(state.download);
+                    writer.Key("state");
+                    writer.String(state_name(state.state));
+                    writer.Key("extract");
+                    writer.String(file.extract.c_str());
+                    writer.Key("entries");
+                    writer.Uint64(file.entries.size());
+                    writer.EndObject();
+                }
+                writer.EndArray();
+                writer.EndObject();
+            }
+            writer.EndArray();
+        });
+    }
+
+    // worker progress, handed to the page on the window thread
+    content::progress_fn content_progress() {
+        return [](const content::progress_info& info) {
+            run_on_ui([info] {
+                post_to_page("contentProgress", [&](json_writer& writer) {
+                    writer.Key("phase");
+                    writer.String(info.phase.c_str());
+                    writer.Key("file");
+                    writer.String(info.file.c_str());
+                    writer.Key("done");
+                    writer.Uint64(info.done);
+                    writer.Key("total");
+                    writer.Uint64(info.total);
+                    writer.Key("speed");
+                    writer.Double(info.speed);
                 });
+            });
+        };
+    }
+
+    void post_content_done(const char* task, bool ok, const std::string& error, bool cancelled) {
+        post_to_page("contentDone", [&](json_writer& writer) {
+            writer.Key("task");
+            writer.String(task);
+            writer.Key("ok");
+            writer.Bool(ok);
+            writer.Key("error");
+            writer.String(error.c_str());
+            writer.Key("cancelled");
+            writer.Bool(cancelled);
+        });
+    }
+
+    void start_content_check(bool full_verify) {
+        if (!content_task.empty())
+            return;
+
+        content_task = "check";
+        content_cancel = false;
+        std::thread([full_verify] {
+            auto result = std::make_shared<content::status>(content::check(full_verify, content_progress(), content_cancel));
+            run_on_ui([result] {
+                content_task.clear();
+                content_status = result;
+                post_content_status();
+
+                // offered once a session, the page asks again from its files list
+                if (result->launcher_update && !launcher_update_offered) {
+                    launcher_update_offered = true;
+                    std::string latest = result->data.launcher_version;
+                    std::string current = content::launcher_version();
+                    post_to_page("update", [&](json_writer& writer) {
+                        writer.Key("latest");
+                        writer.String(latest.c_str());
+                        writer.Key("current");
+                        writer.String(current.c_str());
+                    });
+                }
+            });
+        }).detach();
+    }
+
+    void start_content_download() {
+        if (!content_task.empty() || !content_status || !content_status->ok)
+            return;
+
+        content_task = "download";
+        content_cancel = false;
+        auto current = content_status;
+        std::thread([current] {
+            std::string error;
+            bool ok = content::download_all(*current, content_progress(), content_cancel, error);
+            bool cancelled = !ok && content_cancel;
+            run_on_ui([ok, error, cancelled] {
+                content_task.clear();
+                post_content_done("download", ok, error, cancelled);
+                // the list again, quick now that the cache knows every file
+                start_content_check(false);
             });
         }).detach();
     }
 
     void start_update() {
-        if (updating)
+        if (!content_task.empty() || !content_status || !content_status->launcher_update)
             return;
 
-        updating = true;
-        std::thread([] {
-            bool started = updater::download_and_update();
-            run_on_ui([started] {
-                updating = false;
-                if (started)
+        content_task = "launcher";
+        content_cancel = false;
+        auto current = content_status;
+        std::thread([current] {
+            std::string error;
+            bool ok = content::update_launcher(*current, content_progress(), content_cancel, error);
+            if (ok && !content::restart_launcher()) {
+                ok = false;
+                error = "The launcher was updated, start it again.";
+            }
+            bool cancelled = !ok && content_cancel;
+            run_on_ui([ok, error, cancelled] {
+                content_task.clear();
+                if (ok) {
                     DestroyWindow(main_window);
-                else
-                    post_error("The update could not be downloaded. Try again later.");
+                    return;
+                }
+                post_content_done("launcher", false, error, cancelled);
             });
         }).detach();
+    }
+
+    // --check / --sync (--verify rehashes) without a window, for testing: the result goes to launcher/content-sync.log
+    int run_headless(bool sync, bool verify) {
+        std::ofstream log(launcher::launcher_dir() / "content-sync.log", std::ios::trunc);
+        std::atomic<bool> cancel{ false };
+        std::string last_phase;
+        content::progress_fn progress = [&](const content::progress_info& info) {
+            if (info.phase != last_phase) {
+                last_phase = info.phase;
+                log << "phase " << info.phase << " total " << info.total << std::endl;
+            }
+        };
+
+        content::status result = content::check(verify, progress, cancel);
+        log << "manifest " << content::manifest_location() << "\n";
+        log << "ok " << result.ok << " ready " << result.ready << " download " << result.download
+            << " launcher_update " << result.launcher_update << " error " << result.error << "\n";
+        for (const auto& owner : result.components) {
+            log << "component " << owner.info.id << " " << state_name(owner.state) << " download " << owner.download << "\n";
+            for (const auto& state : owner.files)
+                log << "  " << state_name(state.state) << " " << result.data.files[state.index].path << " download " << state.download << "\n";
+        }
+        if (!sync || !result.ok)
+            return result.ok ? 0 : 1;
+
+        std::string error;
+        // the launcher swaps first, it isn't restarted here
+        if (result.launcher_update) {
+            bool swapped = content::update_launcher(result, progress, cancel, error);
+            log << "launcher " << (swapped ? "updated to " + result.data.launcher_version : "failed " + error) << "\n";
+            if (!swapped)
+                return 1;
+        }
+
+        bool ok = content::download_all(result, progress, cancel, error);
+        log << "sync " << (ok ? "ok" : "failed") << " " << error << std::endl;
+        return ok ? 0 : 1;
     }
 
     void post_play_failed(const std::string& error) {
@@ -255,6 +443,22 @@ namespace {
     void start_play(launcher::play_mode mode) {
         if (playing)
             return;
+
+        // vanilla needs none of our files; the client waits for the download and for the required files
+        if (mode != launcher::play_mode::vanilla) {
+            if (content_task == "download" || content_task == "launcher") {
+                post_play_failed("Wait for the download to finish.");
+                return;
+            }
+            if (content_task == "check") {
+                post_play_failed("Wait for the game file check to finish.");
+                return;
+            }
+            if (content_status && content_status->ok && !content_status->ready) {
+                post_play_failed("Download the required game files first.");
+                return;
+            }
+        }
 
         playing = true;
         std::thread([mode] {
@@ -400,7 +604,7 @@ namespace {
 
         if (action == "ready") {
             post_init();
-            check_for_updates();
+            start_content_check(false);
             SetTimer(main_window, sound_timer, 1000, nullptr);
         }
         else if (action == "drag") {
@@ -509,6 +713,18 @@ namespace {
         }
         else if (action == "update") {
             start_update();
+        }
+        else if (action == "contentCheck") {
+            start_content_check(message.HasMember("verify") && message["verify"].IsTrue());
+        }
+        else if (action == "contentStatus") {
+            post_content_status();
+        }
+        else if (action == "contentDownload") {
+            start_content_download();
+        }
+        else if (action == "contentCancel") {
+            content_cancel = true;
         }
     }
 
@@ -772,6 +988,16 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show) {
 
     if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)))
         return 1;
+
+    // a self-update leaves the previous exe beside this one
+    content::cleanup_old_launcher();
+
+    std::wstring command_line = GetCommandLineW();
+    if (command_line.find(L"--sync") != std::wstring::npos || command_line.find(L"--check") != std::wstring::npos) {
+        int code = run_headless(command_line.find(L"--sync") != std::wstring::npos, command_line.find(L"--verify") != std::wstring::npos);
+        CoUninitialize();
+        return code;
+    }
 
     fs::create_directories(launcher::launcher_dir() / "sounds");
     settings = launcher::load_settings();

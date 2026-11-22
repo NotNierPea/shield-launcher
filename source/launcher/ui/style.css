@@ -939,3 +939,230 @@ body.opening .dock {
     transition: none !important;
   }
 }
+
+/* game files: the chip in the intro, and the list with its download */
+.chip-btn {
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.chip-btn:hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot[data-state="ok"] { background: #3ccf7a; }
+.dot[data-state="update"] { background: var(--accent-2); }
+.dot[data-state="missing"] { background: #f5a524; }
+.dot[data-state="error"] { background: var(--danger); }
+.dot[data-state="busy"] { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+@keyframes pulse-dot {
+  50% { opacity: 0.3; }
+}
+
+.files-summary {
+  margin-top: 0;
+}
+
+.files-summary.error {
+  color: #ff8f93;
+}
+
+.files-body {
+  gap: 8px;
+  max-height: 300px;
+}
+
+.component {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.component-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.component-head:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chevron svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.component.open .chevron svg {
+  transform: rotate(90deg);
+}
+
+.component-text {
+  display: grid;
+  min-width: 0;
+}
+
+.component-name {
+  font-weight: 600;
+}
+
+.component-text small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge.installed { background: rgba(60, 207, 122, 0.12); color: #6fe3a0; }
+.badge.missing { background: rgba(245, 165, 36, 0.14); color: #f7bd5c; }
+.badge.outdated { background: rgba(25, 195, 255, 0.14); color: #6fd8ff; }
+
+.file-list {
+  display: none;
+  padding: 0 12px 10px 38px;
+}
+
+.component.open .file-list {
+  display: grid;
+  gap: 2px;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+
+.file-path {
+  overflow: hidden;
+  font: 12px Consolas, monospace;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.launcher-note {
+  padding: 10px 12px;
+  border: 1px solid rgba(25, 195, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(25, 195, 255, 0.08);
+  color: #9fe4ff;
+  text-align: left;
+}
+
+.files-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.files-progress[hidden] {
+  display: none;
+}
+
+.files-progress .bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.files-progress .bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.2s;
+}
+
+.files-progress-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.files-progress-text span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.files-progress-text span:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.modal-actions [hidden] {
+  display: none;
+}
+
+/* a package row reads left to right, its folder then the file count */
+.file-row.package .file-path {
+  direction: ltr;
+}
+
+.package-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  font: 11px var(--body);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* the client and dedicated, greyed while the game files are checked */
+.dock:not(.launching) .btn-primary:disabled,
+.dock:not(.launching) .btn-secondary:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line);
+  box-shadow: none;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.dock:not(.launching) .btn-primary:disabled::before,
+.dock:not(.launching) .btn-primary:disabled .arrow {
+  display: none;
+}
