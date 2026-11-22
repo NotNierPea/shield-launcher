@@ -13,6 +13,18 @@
     "client_version_file": "../../shield-client/source/proxy-dll/component/watermark.hpp",
     "client_dll": "project-bo4/launcher/XInput9_1_0.dll",
 
+    "ship": {
+        "release_tag": "Release",
+        "zip_name": "Project_BO4_Launcher_Update_{version}.zip",
+        "zip_folder": "${RELEASE}",
+        "client_source": "../../shield-client/source",
+        "support_repo": "../../shield-support-mod",
+        "support_mod": "${GAME}/project-bo4/internals/T8ShieldSupport",
+        "support_dev_mod": "${GAME}/project-bo4/mods/T8ShieldSupport",
+        "support_ff": "${GAME}/project-bo4/zone/support.ff",
+        "support_config": "${GAME}/project-bo4/zone_mods/T8ShieldSupport_FF/config.json"
+    },
+
     "base_zip": [
         { "from": "${RELEASE}/Launch Project BO4.exe", "to": "Launch Project BO4.exe" },
         { "from": "../build/bin/x64/Release/Shield_Launcher.exe", "to": "project-bo4/launcher/Shield_Launcher.exe" },

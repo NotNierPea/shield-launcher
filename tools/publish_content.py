@@ -7,7 +7,8 @@ Builds the launcher's manifest.json and parts from tools/content.json, and publi
     python tools/publish_content.py --out DIR --only-new
                                                      only the parts the release doesn't have yet, plus manifest.json:
                                                      what to drag onto the release page after a change
-    python tools/publish_content.py --upload         uploads the new parts, then manifest.json (needs gh, logged in)
+    python tools/publish_content.py --upload         uploads the new parts, then manifest.json (needs gh, logged in);
+                                                     asks first, --yes skips that. tools/ship.bat runs this
     python tools/publish_content.py --upload --prune also deletes parts neither this nor the previous manifest uses
     python tools/publish_content.py --base-zip FILE  writes the launcher-only download (exe, shortcut, images, sounds)
 
@@ -30,6 +31,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -37,6 +40,9 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 VERSION_HEADER = os.path.join(ROOT, "source", "launcher", "version.hpp")
 CHUNK = 1 << 20
+UPLOAD_ATTEMPTS = 4
+RETRY_SECONDS = 10
+VERSION_OVERRIDE = None  # ship.py's dry run, for a number version.hpp doesn't have yet
 
 
 def fail(message):
@@ -135,7 +141,21 @@ def hash_file(path, part_size):
     return {"size": os.path.getsize(path), "sha256": whole.hexdigest(), "parts": parts}
 
 
+def launcher_source_hash():
+    """the launcher's code without its version number: tells a changed launcher from a rebuild of the same one"""
+    digest = hashlib.sha256()
+    for folder in ("launcher", "utilities"):
+        top = os.path.join(ROOT, "source", folder)
+        for path, relative in folder_files(top, ["version.hpp"]):
+            digest.update(relative.encode())
+            with open(path, "rb") as file:
+                digest.update(file.read().replace(b"\r\n", b"\n"))
+    return digest.hexdigest()
+
+
 def launcher_version():
+    if VERSION_OVERRIDE:
+        return VERSION_OVERRIDE
     with open(VERSION_HEADER, encoding="utf-8") as file:
         match = re.search(r'#define\s+LAUNCHER_VERSION\s+"([^"]+)"', file.read())
     if not match:
@@ -164,43 +184,92 @@ def write_parts(path, info, part_size, out_dir, wanted=None):
     return written
 
 
+GH_MISSING = "the GitHub CLI isn't installed. Run: winget install --id GitHub.cli, open a new terminal, then: gh auth login"
+
+
 def gh(*args, capture=True):
     try:
         result = subprocess.run(["gh", *args], capture_output=capture, text=True)
     except FileNotFoundError:
-        fail("the GitHub CLI (gh) isn't installed: https://cli.github.com, then run gh auth login")
+        fail(GH_MISSING)
     if result.returncode != 0:
         fail("gh %s failed:\n%s" % (" ".join(args), (result.stderr or "").strip()))
     return result.stdout if capture else ""
 
 
-def release_assets(repo, tag, use_gh):
-    """asset names on the release, None when it doesn't exist yet"""
+def require_gh():
+    try:
+        result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
+    except FileNotFoundError:
+        fail(GH_MISSING)
+    if result.returncode != 0:
+        fail("the GitHub CLI isn't logged in. Run: gh auth login")
+
+
+def api_json(path, use_gh):
+    """a GitHub API answer, None on a 404"""
     if use_gh:
-        result = subprocess.run(["gh", "release", "view", tag, "-R", repo, "--json", "assets"], capture_output=True, text=True)
+        try:
+            result = subprocess.run(["gh", "api", path], capture_output=True, text=True)
+        except FileNotFoundError:
+            fail(GH_MISSING)
         if result.returncode != 0:
-            return None
-        return {asset["name"] for asset in json.loads(result.stdout)["assets"]}
+            if "404" in (result.stderr or ""):
+                return None
+            fail("couldn't read %s:\n%s" % (path, (result.stderr or "").strip()))
+        return json.loads(result.stdout)
 
     # the public api is enough to read a public release (a dry run doesn't need gh)
+    request = urllib.request.Request("https://api.github.com/" + path, headers={"User-Agent": "shield-publish-content"})
     try:
-        request = urllib.request.Request("https://api.github.com/repos/%s/releases/tags/%s" % (repo, tag),
-                                         headers={"User-Agent": "shield-publish-content"})
         with urllib.request.urlopen(request, timeout=20) as response:
-            release = json.load(response)
-    except Exception:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        fail("couldn't read %s: %s" % (path, error))
+    except OSError as error:
+        fail("couldn't read %s: %s" % (path, error))
+
+
+def release_assets(repo, tag, use_gh):
+    """{name: size} of the fully uploaded assets (a broken upload doesn't count), None when the release doesn't exist yet"""
+    release = api_json("repos/%s/releases/tags/%s" % (repo, tag), use_gh)
+    if release is None:
         return None
-    names = set()
+    assets = {}
     page = 1
     while True:
-        request = urllib.request.Request("https://api.github.com/repos/%s/releases/%d/assets?per_page=100&page=%d" % (repo, release["id"], page),
-                                         headers={"User-Agent": "shield-publish-content"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            batch = json.load(response)
-        names.update(asset["name"] for asset in batch)
+        batch = api_json("repos/%s/releases/%d/assets?per_page=100&page=%d" % (repo, release["id"], page), use_gh) or []
+        assets.update({asset["name"]: asset["size"] for asset in batch if asset.get("state", "uploaded") == "uploaded"})
         if len(batch) < 100:
-            return names
+            return assets
         page += 1
+
+
+def upload_asset(repo, tag, path):
+    """retried, a long upload can drop; --clobber also replaces a broken earlier try"""
+    error = ""
+    for attempt in range(1, UPLOAD_ATTEMPTS + 1):
+        try:
+            result = subprocess.run(["gh", "release", "upload", tag, path, "-R", repo, "--clobber"], capture_output=True, text=True)
+        except FileNotFoundError:
+            fail(GH_MISSING)
+        if result.returncode == 0:
+            return
+        error = (result.stderr or "").strip()
+        if attempt < UPLOAD_ATTEMPTS:
+            print("  failed (try %d of %d), retrying: %s" % (attempt, UPLOAD_ATTEMPTS, error.splitlines()[-1] if error else "no message"))
+            time.sleep(RETRY_SECONDS * attempt)
+    fail("couldn't upload %s:\n%s\nmanifest.json wasn't changed unless this was it. Run the script again, it continues." % (os.path.basename(path), error))
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for data in iter(lambda: file.read(CHUNK), b""):
+            digest.update(data)
+    return digest.hexdigest()
 
 
 def live_manifest(repo, tag):
@@ -229,17 +298,21 @@ def size_text(size):
     return "%.2f GB" % (size / 2 ** 30) if size >= 2 ** 30 else "%.1f MB" % (size / 2 ** 20)
 
 
-def main():
+def main(argv=None, note=""):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", default=os.path.join(TOOLS, "content.json"))
     parser.add_argument("--version", help="the content version, the date and time by default")
     parser.add_argument("--out", help="write manifest.json and the parts into this folder")
     parser.add_argument("--only-new", action="store_true", help="with --out, write only the parts the release doesn't have yet (into an empty folder)")
     parser.add_argument("--upload", action="store_true", help="upload the new parts and manifest.json with gh")
+    parser.add_argument("--yes", action="store_true", help="with --upload, don't ask before publishing")
     parser.add_argument("--prune", action="store_true", help="with --upload, delete parts the new and previous manifests don't use")
     parser.add_argument("--no-launcher", action="store_true", help="leave the launcher out of the manifest (no self-update)")
+    parser.add_argument("--reuse-launcher", action="store_true", help="keep the launcher entry of the live manifest")
     parser.add_argument("--base-zip", help="also write the launcher-only download zip here")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.upload:
+        require_gh()
 
     with open(args.config, encoding="utf-8") as file:
         config = json.load(file)
@@ -277,7 +350,12 @@ def main():
             manifest["files"].append(entry)
             sources[target] = (source, info)
 
-    if not args.no_launcher and config.get("launcher"):
+    if args.reuse_launcher:
+        published = live_manifest(repo, tag)
+        if not published or not published.get("launcher"):
+            fail("there's no published launcher to keep")
+        manifest["launcher"] = published["launcher"]
+    elif not args.no_launcher and config.get("launcher"):
         exe = expand(config["launcher"], variables, base)
         if not os.path.isfile(exe):
             fail("launcher not built: " + exe + " (build Release, or pass --no-launcher)")
@@ -296,7 +374,7 @@ def main():
         if not built or built.group(1).decode() != version:
             fail("%s is version %s, version.hpp says %s: build Release again" % (exe, built.group(1).decode() if built else "unknown", version))
         info = hash_file(exe, part_size)
-        manifest["launcher"] = {"version": version, "file": info}
+        manifest["launcher"] = {"version": version, "source": launcher_source_hash(), "file": info}
         sources["<launcher>"] = (exe, info)
 
     # the client dll has to be the build of this version: its watermark keeps the version as a string of its own
@@ -330,7 +408,8 @@ def main():
         print("\nwrote " + args.base_zip + " (" + size_text(os.path.getsize(args.base_zip)) + ")")
 
     existing = release_assets(repo, tag, args.upload)
-    new_parts = needed - (existing or set())
+    # a part counts as there only when it's whole
+    new_parts = {name for name in needed if (existing or {}).get(name) != part_sizes[name]}
     print("\nrelease %s/%s: %s, %d of %d parts new (%s to upload)" % (
         repo, tag, "not created yet" if existing is None else "%d assets" % len(existing),
         len(new_parts), len(needed), size_text(sum(part_sizes[name] for name in new_parts))))
@@ -351,49 +430,88 @@ def main():
             json.dump(manifest, file, indent=1)
         print("\nwrote manifest.json and %d parts to %s" % (len(wanted) if args.only_new else len(needed), args.out))
         if args.only_new:
-            print("upload all of it to the %s release: delete its old manifest.json first, GitHub won't replace it" % tag)
+            print("on the %s release: upload the .bin files first, then delete the old manifest.json and upload the new one" % tag)
 
     if not args.upload:
         if not args.out:
             print("dry run, nothing written. --upload publishes, --out DIR writes a local copy.")
-        return
+        return "dry-run"
 
+    # the same files as what's live: nothing for players to download, so nothing to publish
     previous = live_manifest(repo, tag)
-    if existing is None:
-        gh("release", "create", tag, "-R", repo, "--title", "Game files", "--latest=false",
-           "--notes", "Files the Shield launcher downloads (manifest.json and its parts). Not a download for players.")
-        existing = set()
+    same = previous is not None and not new_parts and all(previous.get(key) == manifest.get(key) for key in ("files", "launcher", "components", "remove"))
+    if same:
+        print("\nnothing changed since content %s, nothing to publish" % previous.get("version"))
+    else:
+        if not args.yes:
+            if not sys.stdin.isatty():
+                fail("--upload needs --yes when it can't ask")
+            answer = input("\npublish content %s to players, uploading %s%s? [y/N] " % (
+                manifest["version"], size_text(sum(part_sizes[name] for name in new_parts)), note))
+            if answer.strip().lower() not in ("y", "yes"):
+                print("cancelled, nothing uploaded")
+                return "cancelled"
 
-    # the parts first, a few at a time, each written out only for its upload
-    with tempfile.TemporaryDirectory(prefix="shield_content_") as temp:
-        pending = sorted(new_parts)
-        for source, info in sources.values():
-            mine = [part["sha256"] + ".bin" for part in info["parts"] if part["sha256"] + ".bin" in pending]
-            if not mine:
-                continue
-            written = write_parts(source, info, part_size, temp, set(mine))
-            for path in written:
-                print("uploading %s (%s)" % (os.path.basename(path), size_text(os.path.getsize(path))))
-                gh("release", "upload", tag, path, "-R", repo, "--clobber", capture=False)
-                os.remove(path)
-            pending = [name for name in pending if name not in mine]
+        if existing is None:
+            gh("release", "create", tag, "-R", repo, "--title", "Game files", "--latest=false",
+               "--notes", "Files the Shield launcher downloads (manifest.json and its parts). Not a download for players.")
 
-        # manifest.json last, and a dated copy that --prune and history can use
-        manifest_path = os.path.join(temp, "manifest.json")
-        with open(manifest_path, "w", encoding="utf-8") as file:
-            json.dump(manifest, file, indent=1)
-        dated = os.path.join(temp, "manifest-%s.json" % manifest["version"])
-        shutil.copy(manifest_path, dated)
-        gh("release", "upload", tag, manifest_path, dated, "-R", repo, "--clobber", capture=False)
-    print("\npublished content %s" % manifest["version"])
+        with tempfile.TemporaryDirectory(prefix="shield_content_") as temp:
+            # the parts first, each written out only for its upload and checked: a file rebuilt since hashing would be a bad part
+            done = 0
+            for source, info in sources.values():
+                mine = {part["sha256"] + ".bin" for part in info["parts"]} & new_parts
+                if not mine:
+                    continue
+                for path in write_parts(source, info, part_size, temp, mine):
+                    name = os.path.basename(path)
+                    if file_sha256(path) + ".bin" != name:
+                        fail("%s changed while publishing, nothing went live. Run the script again." % source)
+                    done += 1
+                    print("uploading %d of %d: %s (%s)" % (done, len(new_parts), name, size_text(os.path.getsize(path))), flush=True)
+                    upload_asset(repo, tag, path)
+                    os.remove(path)
+                new_parts -= mine
+
+            # every part has to be whole on the release before players are pointed at it
+            uploaded = release_assets(repo, tag, True) or {}
+            missing = sorted(name for name in needed if uploaded.get(name) != part_sizes[name])
+            if missing:
+                fail("%d parts aren't whole on the release (%s...), manifest.json wasn't changed. Run the script again." % (len(missing), missing[0][:16]))
+
+            # a dated copy first, then manifest.json: the one upload that goes live
+            manifest_path = os.path.join(temp, "manifest.json")
+            with open(manifest_path, "w", encoding="utf-8") as file:
+                json.dump(manifest, file, indent=1)
+            dated = os.path.join(temp, "manifest-%s.json" % manifest["version"])
+            shutil.copy(manifest_path, dated)
+            upload_asset(repo, tag, dated)
+            upload_asset(repo, tag, manifest_path)
+
+        live = None
+        for _ in range(6):
+            live = live_manifest(repo, tag)
+            if live and live.get("version") == manifest["version"]:
+                break
+            time.sleep(RETRY_SECONDS / 2)
+        if live and live.get("version") == manifest["version"]:
+            print("\npublished content %s, it's live" % manifest["version"])
+        else:
+            print("\nuploaded content %s, but the download link doesn't show it yet: check it in a minute" % manifest["version"])
 
     if args.prune:
+        # without the previous manifest, a player mid-download could still need any part
+        if previous is None:
+            print("not pruning: the previous manifest couldn't be read")
+            return "unchanged" if same else "published"
         keep = needed | manifest_parts(previous)
-        stale = sorted(name for name in existing if name.endswith(".bin") and name not in keep)
+        current = release_assets(repo, tag, True) or {}
+        stale = sorted(name for name in current if name.endswith(".bin") and name not in keep)
         for name in stale:
             print("deleting " + name)
             gh("release", "delete-asset", tag, name, "-R", repo, "-y", capture=False)
         print("pruned %d parts" % len(stale))
+    return "unchanged" if same else "published"
 
 
 if __name__ == "__main__":
