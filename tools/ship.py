@@ -3,6 +3,8 @@ Ships an update in one command: checks everything, builds the launcher, uploads 
 
     tools\\ship.bat                  ships at the client's version (shield-client's watermark.hpp)
     tools\\ship.bat 1.1.5            the same, and stops unless the client is 1.1.5
+    tools\\ship.bat --bump           sets the client to the published version + 1 and stops so you can build it;
+                                    run it again after the build and it ships that version
     tools\\ship.bat --dry-run        only the checks and what would be uploaded
     tools\\ship.bat --allow-stale    ships even if a build is older than its source
     tools\\ship.bat --keep-launcher  ships with the published launcher although its code changed
@@ -113,6 +115,47 @@ class Release:
 
     def zip_name(self, version):
         return self.ship["zip_name"].format(version=version)
+
+
+def next_version(version):
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        p.fail("can't bump a version that doesn't look like 1.1.5: " + version)
+    head, last = version.rsplit(".", 1)
+    return "%s.%d" % (head, int(last) + 1)
+
+
+def published_version(release, use_gh):
+    """the live launcher's version, None when nothing is published; an unreadable one stops, a guess could reuse a number"""
+    assets = p.release_assets(release.repo, release.tag, use_gh)
+    if not assets or "manifest.json" not in assets:
+        return None
+    live = p.live_manifest(release.repo, release.tag)
+    entry = live.get("launcher") if live else None
+    if not entry:
+        p.fail("couldn't read the published version, nothing was changed")
+    return entry["version"]
+
+
+def bump_target(release, client, use_gh):
+    """the number to bump to, None when the client is already ahead of what's published (bumped, waiting to ship)"""
+    published = published_version(release, use_gh)
+    if published and version_tuple(client) > version_tuple(published):
+        return None
+    if published and version_tuple(published) > version_tuple(client):
+        return next_version(published)
+    return next_version(client)
+
+
+def set_client_version(release, version):
+    path = release.path(release.config["client_version_file"])
+    with open(path, "rb") as file:
+        data = file.read()
+    updated, count = re.subn(rb'(version\s*=\s*")[^"]+(")', lambda m: m.group(1) + version.encode() + m.group(2), data, count=1)
+    if count != 1:
+        p.fail("no version to change in " + path)
+    with open(path, "wb") as file:
+        file.write(updated)
+    return path
 
 
 def check_client(release, version):
@@ -283,6 +326,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("version", nargs="?", help="the update number, the client has to be at it")
     parser.add_argument("--config", default=os.path.join(TOOLS, "content.json"))
+    parser.add_argument("--bump", action="store_true", help="set the client to the published version + 1, build it, then run this again")
     parser.add_argument("--dry-run", action="store_true", help="only the checks and what would be uploaded")
     parser.add_argument("--allow-stale", action="store_true", help="ship even if a build is older than its source")
     parser.add_argument("--keep-launcher", action="store_true", help="keep the published launcher although its code changed")
@@ -295,6 +339,21 @@ def main(argv=None):
 
     release = Release(args.config)
     client = release.client_version()
+    if args.bump:
+        if args.version:
+            p.fail("use either --bump or a version number, not both")
+        target = bump_target(release, client, not args.dry_run)
+        if target and args.dry_run:
+            print("--bump would set the client from %s to %s, then wait for you to build it. Nothing was changed." % (client, target))
+            return "dry-run"
+        if target:
+            path = set_client_version(release, target)
+            print("client version set from %s to %s in %s" % (client, target, path))
+            print("\nnothing was uploaded. Build the client, then run this again:")
+            print("  python tools/ship.py --bump")
+            return "bumped"
+        print("the client is already at %s, ahead of what's published: shipping it" % client)
+
     version = args.version or client
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         p.fail("the update number looks like 1.1.5, not " + version)
